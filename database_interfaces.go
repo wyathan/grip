@@ -16,7 +16,6 @@ type Accountdb interface {
 type Nodedb interface {
 	GetNode(id []byte) *gripdata.Node
 	GetPrivateNodeData() (*gripdata.Node, *gripdata.MyNodePrivateData)
-	GetShareNodeInfo(id []byte, target []byte) *gripdata.ShareNodeInfo
 	StoreNode(n *gripdata.Node) error
 	StoreMyPrivateNodeData(n *gripdata.Node, pr *gripdata.MyNodePrivateData) error
 	StoreShareNodeInfo(sn *gripdata.ShareNodeInfo) error
@@ -31,7 +30,9 @@ type Nodedb interface {
 type Netdb interface {
 	StoreSendData(s *gripdata.SendData) error
 	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
-	DeleteSendData(s *gripdata.SendData) error              //Data has been setnt to the node
+	//                                                           WARNING! Must be sorted by Timestamp
+	DeleteSendData(s *gripdata.SendData) error //Data has been setnt to the node
+	GetDigestData(d []byte) interface{}
 }
 
 //NodeAccountdb implements both Nodedb and Accountdb
