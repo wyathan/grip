@@ -94,6 +94,12 @@ func IncomingShareNode(s *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
+
+	//Now send all the share data to the new node
+	err = SendAllSharesToNew(s.NodeID, s.TargetNodeID, db)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -130,6 +136,11 @@ func IncomingUseShareNodeKey(k *gripdata.UseShareNodeKey, db NodeNetAccountdb) e
 	err = SendAllToAllKey(k, k.Key, db)
 	if err != nil {
 		return err
+	}
+
+	kl := db.ListShareNodeKey(k.Key)
+	for _, v := range kl {
+		SendAllSharesToNew(v.NodeID, k.NodeID, db)
 	}
 
 	return nil

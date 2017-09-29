@@ -31,7 +31,7 @@ type Netdb interface {
 	StoreSendData(s *gripdata.SendData) error
 	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
 	//                                                           WARNING! Must be sorted by Timestamp
-	DeleteSendData(s *gripdata.SendData) error //Data has been setnt to the node
+	DeleteSendData(d []byte, to []byte) error //Data has been setnt to the node
 	GetDigestData(d []byte) interface{}
 }
 

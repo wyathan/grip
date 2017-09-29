@@ -43,6 +43,10 @@ func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetdb) error {
 	if err != nil {
 		return err
 	}
+	err = SendAllSharesToNew(id, n.TargetNodeID, db)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -124,6 +128,42 @@ func FindAllToShareWith(id []byte, db NodeNetdb) [][]byte {
 		s = append(s, v)
 	}
 	return s
+}
+
+//SendAllSharesToNew sends all data to a new share node
+func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
+	shl := db.ListShareNodeInfo(from)
+	km := make(map[string]bool)
+	for _, sr := range shl {
+		nd := db.GetNode(sr.TargetNodeID)
+		err := CreateNewSend(nd, to, db)
+		if err != nil {
+			return err
+		}
+		err = CreateNewSend(&sr, to, db)
+		if err != nil {
+			return err
+		}
+		if sr.Key != "" {
+			km[sr.Key] = true
+		}
+	}
+	for k := range km {
+		//Find all nodes that used key
+		skl := db.ListUseShareNodeKey(k)
+		for _, sk := range skl {
+			nd := db.GetNode(sk.NodeID)
+			err := CreateNewSend(nd, to, db)
+			if err != nil {
+				return err
+			}
+			err = CreateNewSend(&sk, to, db)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 //SendAllToShareWith sends new data to all nodes on share list

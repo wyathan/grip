@@ -140,14 +140,19 @@ func (t *TestDB) StoreSendData(s *gripdata.SendData) error {
 }
 func (t *TestDB) GetSendData(target []byte, max int) []gripdata.SendData {
 	tk := base64.StdEncoding.EncodeToString(target)
-	return t.SendData[tk] //Already sorted
+	var r []gripdata.SendData
+	rc := t.SendData[tk] //Already sorted
+	for c := 0; c < len(rc) && c < max; c++ {
+		r = append(r, rc[c])
+	}
+	return r
 }
-func (t *TestDB) DeleteSendData(s *gripdata.SendData) error {
-	tk := base64.StdEncoding.EncodeToString(s.TargetID)
+func (t *TestDB) DeleteSendData(d []byte, to []byte) error {
+	tk := base64.StdEncoding.EncodeToString(to)
 	sl := t.SendData[tk]
 	var nl []gripdata.SendData
 	for _, v := range sl {
-		if !bytes.Equal(v.Dig, s.Dig) {
+		if !bytes.Equal(v.Dig, to) {
 			nl = append(nl, v)
 		}
 	}
