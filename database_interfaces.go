@@ -33,6 +33,14 @@ type Netdb interface {
 	//                                                           WARNING! Must be sorted by Timestamp
 	DeleteSendData(d []byte, to []byte) error //Data has been setnt to the node
 	GetDigestData(d []byte) interface{}
+	//NodeEphemera.Connectable == true
+	//NodeEphemera.Connected == false
+	//NodeEphemera.NextAttempt <= curtime
+	//exists some SendData.TargetID == NodeEphemera.ID
+	GetConnectableNodesWithSendData(max int, curtime uint64) []gripdata.NodeEphemera
+	GetAllConnected() []gripdata.NodeEphemera
+	GetNodeEphemera(id []byte) *gripdata.NodeEphemera
+	StoreNodeEphemera(ne *gripdata.NodeEphemera) error
 }
 
 //NodeAccountdb implements both Nodedb and Accountdb

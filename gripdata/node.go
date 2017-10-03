@@ -19,6 +19,18 @@ type Node struct {
 	Sig         []byte //Signed private key of this node
 }
 
+//NodeEphemera is local data kept about this node, it is used to query
+//for nodes we wish to initiate connections
+type NodeEphemera struct {
+	ID               []byte //Unique id for the node
+	Connectable      bool   //Can we directly connect to it
+	LastConnAttempt  uint64 //Last time we attempted to connect this node
+	LastConnection   uint64 //Last time we successfully connected to this node
+	LastConnReceived uint64 //Last time this node connected to us
+	NextAttempt      uint64 //The next time we should attempt to connect to this node
+	Connected        bool   //Are we currently connected
+}
+
 //Digest Node
 func (a *Node) Digest() []byte {
 	h := sha512.New()

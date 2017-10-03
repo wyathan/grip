@@ -20,6 +20,16 @@ const SLEEPONNOSEND time.Duration = 1 * time.Second
 //BUFFERSIZE is the send channel size
 const BUFFERSIZE int = 2
 
+//MAXCONNECTIONS is the maximum number of connections we allow
+const MAXCONNECTIONS int = 1000
+
+//MAXCONNECTIONATTEMPTS number of connections to attempt at once
+const MAXCONNECTIONATTEMPTS int = 20
+
+//SLEEPONNOCONNECTIONS if we run out of connections how long do
+//we wait until we test it again
+const SLEEPONNOCONNECTIONS time.Duration = 5 * time.Second
+
 //Connection handles sending and reading data
 //on a connection
 type Connection interface {
@@ -33,6 +43,7 @@ type Connection interface {
 type Socket interface {
 	ConnectTo(n *gripdata.Node) (Connection, error)
 	Accept() (Connection, error)
+	Close()
 }
 
 //SocketController handles a socket
@@ -47,6 +58,11 @@ type SocketController struct {
 func (s *SocketController) addConnection(c *ConnectionController) bool {
 	s.Lock()
 	defer s.Unlock()
+	if len(s.Connections) >= MAXCONNECTIONS {
+		c.SocketCtrl = nil
+		c.Close()
+		return false
+	}
 	ck := base64.StdEncoding.EncodeToString(c.C.GetNodeID())
 	cc := s.Connections[ck]
 	if cc != nil {
@@ -54,6 +70,7 @@ func (s *SocketController) addConnection(c *ConnectionController) bool {
 		c.Close()
 		return false
 	}
+	c.SocketCtrl = s
 	s.Connections[ck] = c
 	return true
 }
@@ -72,6 +89,12 @@ func (s *SocketController) checkConnection(id []byte) bool {
 	return nil != s.Connections[ck]
 }
 
+func (s *SocketController) numberConnections() int {
+	s.Lock()
+	defer s.Unlock()
+	return len(s.Connections)
+}
+
 func (s *SocketController) listConnections() []*ConnectionController {
 	s.Lock()
 	defer s.Unlock()
@@ -82,8 +105,49 @@ func (s *SocketController) listConnections() []*ConnectionController {
 	return r
 }
 
-//ListenRoutine handles new incoming connections
-func (s *SocketController) ListenRoutine() {
+//Close everything!  It's over man
+func (s *SocketController) Close() {
+	cg := s.closeGate()
+	if cg {
+		s.closeAllConnections()
+		s.S.Close()
+	}
+}
+
+func (s *SocketController) closeGate() bool {
+	s.Lock()
+	defer s.Unlock()
+	if !s.Done {
+		s.Done = true
+		return true
+	}
+	return false
+}
+
+func (s *SocketController) closeAllConnections() {
+	cl := s.listConnections()
+	for _, c := range cl {
+		c.Close()
+	}
+}
+
+//Start begin the goroutines for the SocketController
+func (s *SocketController) Start() {
+	//We're just starting.  We can't be
+	//connected to any node
+	cl := s.DB.GetAllConnected()
+	for _, c := range cl {
+		c.Connected = false
+		err := s.DB.StoreNodeEphemera(&c)
+		if err != nil {
+			log.Fatal("Failed to update database")
+		}
+	}
+	go s.listenRoutine()
+	go s.connectRoutine()
+}
+
+func (s *SocketController) listenRoutine() {
 	con, err := s.S.Accept()
 	for !s.Done && err == nil {
 		if con.GetNodeID() == nil {
@@ -92,13 +156,21 @@ func (s *SocketController) ListenRoutine() {
 			var ctrl ConnectionController
 			ctrl.C = con
 			ctrl.DB = s.DB
+			ctrl.Incoming = true
 			ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
-			ctrl.SocketCtrl = s
 			s.addConnection(&ctrl)
 			go ctrl.ConnectionReadRoutine()
 			go ctrl.ConnectionWriteRoutine()
-			con, err = s.S.Accept()
 		}
+		con, err = s.S.Accept()
+	}
+}
+
+func (s *SocketController) connectRoutine() {
+	for !s.Done {
+		//Check max connections
+		
+		cl := s.DB.GetConnectableNodesWithSendData()
 	}
 }
 
@@ -108,6 +180,7 @@ type ConnectionController struct {
 	C          Connection
 	SendChan   chan interface{}
 	Done       bool
+	Incoming   bool
 	DB         NodeNetAccountdb
 	SocketCtrl *SocketController
 }
@@ -184,43 +257,46 @@ func (ctrl *ConnectionController) deleteSendData(d []byte) error {
 func (ctrl *ConnectionController) ConnectionWriteRoutine() {
 	defer ctrl.C.Close() //Only close connection here
 
-	myn, _ := ctrl.DB.GetPrivateNodeData()
-	ctrl.C.Send(myn)
-
-	c, err := ctrl.sendFromDatabase()
-	for err == nil && !ctrl.Done {
-		timeout := make(chan bool, 1)
-		go func(ct int) {
-			if ct == 0 {
-				time.Sleep(SLEEPONNOSEND)
-			}
-			timeout <- true
-		}(c)
-		select {
-		case r, ok := <-ctrl.SendChan:
-			if !ok || ctrl.Done {
-				//Do not call ctrl.Close() because
-				//its only purpose is to close ctlr.S
-				//so that this routine exits.  We're
-				//already exiting this routine and
-				//the connection will be closed.
-				ctrl.Done = true
-			} else {
-				switch v := r.(type) {
-				case SendDig:
-					err = ctrl.sendSendData(v.Dig)
-				case bool:
-					c, err = ctrl.sendFromDatabase()
-				default:
-					err = ctrl.C.Send(v)
+	if !ctrl.Done {
+		ctrl.setConnected(ctrl.Incoming)
+		myn, _ := ctrl.DB.GetPrivateNodeData()
+		ctrl.C.Send(myn)
+		c, err := ctrl.sendFromDatabase()
+		for err == nil && !ctrl.Done {
+			timeout := make(chan bool, 1)
+			go func(ct int) {
+				if ct == 0 {
+					time.Sleep(SLEEPONNOSEND)
 				}
+				timeout <- true
+			}(c)
+			select {
+			case r, ok := <-ctrl.SendChan:
+				if !ok || ctrl.Done {
+					//Do not call ctrl.Close() because
+					//its only purpose is to close ctlr.S
+					//so that this routine exits.  We're
+					//already exiting this routine and
+					//the connection will be closed.
+					ctrl.Done = true
+				} else {
+					switch v := r.(type) {
+					case SendDig:
+						err = ctrl.sendSendData(v.Dig)
+					case bool:
+						c, err = ctrl.sendFromDatabase()
+					default:
+						err = ctrl.C.Send(v)
+					}
+				}
+			case <-timeout:
+				c, err = ctrl.sendFromDatabase()
 			}
-		case <-timeout:
-			c, err = ctrl.sendFromDatabase()
 		}
-	}
-	if err != nil {
-		log.Printf("Connection error: %s\n", err)
+		if err != nil {
+			log.Printf("Connection error: %s\n", err)
+		}
+		ctrl.setConnectionClosed()
 	}
 }
 
@@ -265,5 +341,29 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 	}
 	if err != nil {
 		log.Printf("Connection error: %s\n", err)
+	}
+}
+
+func (ctrl *ConnectionController) setConnected(incomming bool) error {
+	nid := ctrl.DB.GetNodeEphemera(ctrl.C.GetNodeID())
+	if nid == nil {
+		var n gripdata.NodeEphemera
+		n.ID = ctrl.C.GetNodeID()
+		nid = &n
+	}
+	nid.Connected = true
+	if incomming {
+		nid.LastConnReceived = uint64(time.Now().UnixNano())
+	} else {
+		nid.LastConnection = uint64(time.Now().UnixNano())
+	}
+	return ctrl.DB.StoreNodeEphemera(nid)
+}
+
+func (ctrl *ConnectionController) setConnectionClosed() {
+	nid := ctrl.DB.GetNodeEphemera(ctrl.C.GetNodeID())
+	if nid != nil {
+		nid.Connected = false
+		ctrl.DB.StoreNodeEphemera(nid)
 	}
 }

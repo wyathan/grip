@@ -26,6 +26,17 @@ func IncomingNode(n *gripdata.Node, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
+	ne := db.GetNodeEphemera(n.ID)
+	if ne == nil {
+		var neph gripdata.NodeEphemera
+		neph.ID = n.ID
+		ne = &neph
+	}
+	ne.Connectable = n.Connectable
+	err = db.StoreNodeEphemera(ne)
+	if err != nil {
+		return err
+	}
 	if !CheckAccountEnabled(n, db) {
 		return errors.New("Account is not enabled")
 	}
