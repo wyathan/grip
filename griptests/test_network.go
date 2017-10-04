@@ -120,6 +120,8 @@ func (s *TestSocket) ConnectTo(n *gripdata.Node) (grip.Connection, error) {
 
 	ts.SC <- &tr
 
+	log.Printf("CONNECTTO: NODE: %d is connecting to node %d\n", s.Index, ts.Index)
+
 	return &t, nil
 }
 

@@ -9,16 +9,18 @@ import (
 //UseShareNodeKey nodes can present this to
 //other nodes to get into about another node
 type UseShareNodeKey struct {
-	NodeID []byte
-	Key    string
-	Dig    []byte
-	Sig    []byte
+	NodeID   []byte
+	TargetID []byte //The target node that knows of the other node
+	Key      string
+	Dig      []byte
+	Sig      []byte
 }
 
 //Digest UseShareNodeKey
 func (a *UseShareNodeKey) Digest() []byte {
 	h := sha512.New()
 	gripcrypto.HashBytes(h, a.NodeID)
+	gripcrypto.HashBytes(h, a.TargetID)
 	gripcrypto.HashString(h, a.Key)
 	a.Dig = h.Sum(nil)
 	return a.Dig

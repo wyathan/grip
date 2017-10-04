@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/wyathan/grip/gripcrypto"
@@ -37,6 +38,7 @@ func IncomingNode(n *gripdata.Node, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
+	createAutoAccount(pr, n.ID, db)
 	if !CheckAccountEnabled(n, db) {
 		return errors.New("Account is not enabled")
 	}
@@ -63,6 +65,7 @@ func IncomingShareNode(s *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
+	createAutoAccount(pr, s.NodeID, db)
 	if !CheckAccountEnabled(s, db) {
 		return errors.New("Node account is not enabled")
 	}
@@ -71,14 +74,24 @@ func IncomingShareNode(s *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 		return err
 	}
 	if bytes.Equal(pr.ID, tn) {
+		log.Println("Sharing node data with me")
 		//Yippy skippy.  They want to share their data with me
 		//Do we want to auto-reciprocate?
-		if pr.AutoShareNodeInfo {
-			var ns gripdata.ShareNodeInfo
-			ns.TargetNodeID = s.NodeID
-			ns.MetaData = pr.AutoShareMetaData
-			NewShareNode(&ns, db)
-		}
+		//NOTE: This is dangerous.  A public node should
+		//Never have this on or anyone could connect share their
+		//info and get information about all other nodes.
+		//It is also broken in that we can get into a loop
+		//between two nodes that both have this on
+		//if pr.AutoShareNodeInfo {
+		//	log.Println("Autoshare is enabled")
+		//	var ns gripdata.ShareNodeInfo
+		//	ns.TargetNodeID = s.NodeID
+		//	ns.MetaData = pr.AutoShareMetaData
+		//	err := NewShareNode(&ns, db)
+		//	if err != nil {
+		//		log.Printf("Failed to create autoshare: %s\n", err)
+		//	}
+		//}
 		return nil
 	}
 	//Another node wants to share their node data with someone else
@@ -128,6 +141,7 @@ func IncomingUseShareNodeKey(k *gripdata.UseShareNodeKey, db NodeNetAccountdb) e
 	if err != nil {
 		return err
 	}
+	createAutoAccount(pr, k.NodeID, db)
 	if !CheckAccountEnabled(k, db) {
 		return errors.New("Node account is not enabled")
 	}
@@ -178,6 +192,10 @@ func VerifyNode(n *gripdata.Node) error {
 func GetNodeAccount(id []byte, db Accountdb) *gripdata.Account {
 	na := db.GetNodeAccount(id)
 	if na == nil {
+		return nil
+	}
+	log.Printf("FOUND ACCOUNT: %s\n", na.AccountID)
+	if !na.Enabled {
 		return nil
 	}
 	return db.GetAccount(na.AccountID)

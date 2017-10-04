@@ -221,7 +221,7 @@ func (t *TestDB) DeleteSendData(d []byte, to []byte) error {
 	sl := t.SendData[tk]
 	var nl []gripdata.SendData
 	for _, v := range sl {
-		if !bytes.Equal(v.Dig, to) {
+		if !bytes.Equal(v.Dig, d) {
 			nl = append(nl, v)
 		}
 	}
@@ -233,7 +233,7 @@ func (t *TestDB) GetConnectableNodesWithSendData(max int, curtime uint64) []grip
 	defer t.Unlock()
 	var r []gripdata.NodeEphemera
 	for _, v := range t.NodeEphemera {
-		if !v.Connected && len(r) < max && v.NextAttempt <= curtime {
+		if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable {
 			tk := base64.StdEncoding.EncodeToString(v.ID)
 			if len(t.SendData[tk]) > 0 {
 				r = append(r, *v)

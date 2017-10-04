@@ -1,8 +1,10 @@
 package grip
 
 import (
+	"crypto/rand"
 	"crypto/sha512"
 	"errors"
+	"log"
 	"reflect"
 	"time"
 
@@ -18,11 +20,14 @@ func ListShareWithMe() []gripdata.ShareNodeInfo {
 
 //NewShareNode states that this node's Node data should be
 //shared with another node
-func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetdb) error {
-	id := n.NodeID
-	if id == nil {
-		return errors.New("NodeID is nil")
-	}
+func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
+	myn, mypr := db.GetPrivateNodeData()
+	id := myn.ID
+	n.SetNodeID(id)
+
+	//See if the target node already has an account
+	createAutoAccount(mypr, n.TargetNodeID, db)
+
 	err := SignNodeSig(n, db)
 	if err != nil {
 		return err
@@ -53,12 +58,11 @@ func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetdb) error {
 //NewUseShareNodeKey states that this node's Node data should be
 //shared with another node
 func NewUseShareNodeKey(n *gripdata.UseShareNodeKey, db NodeNetdb) error {
+	myn, _ := db.GetPrivateNodeData()
+	id := myn.ID
+	n.SetNodeID(id)
 	if n.Key == "" {
 		return errors.New("Key cannot be empty")
-	}
-	id := n.NodeID
-	if id == nil {
-		return errors.New("NodeID is nil")
 	}
 	err := SignNodeSig(n, db)
 	if err != nil {
@@ -72,15 +76,42 @@ func NewUseShareNodeKey(n *gripdata.UseShareNodeKey, db NodeNetdb) error {
 	if nd == nil {
 		return errors.New("This node is not found")
 	}
-	err = SendAllToAllKey(nd, n.Key, db)
-	if err != nil {
-		return err
-	}
-	err = SendAllToAllKey(n, n.Key, db)
+	err = CreateNewSend(n, n.TargetID, db)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func createAutoAccount(mypr *gripdata.MyNodePrivateData, target []byte, db Accountdb) {
+	na := db.GetNodeAccount(target)
+	if na == nil && mypr.AutoCreateShareAccount {
+		var a gripdata.Account
+		b := make([]byte, 32)
+		rand.Reader.Read(b)
+		a.AccountID = base64.StdEncoding.EncodeToString(b)
+		log.Printf("Automatically creating account %s\n", a.AccountID)
+		a.AllowCacheMode = mypr.AutoAccountAllowCacheMode
+		a.AllowContextNode = mypr.AutoAccountAllowContextNode
+		a.AllowContextSource = mypr.AutoAccountAllowContextSource
+		a.AllowFullRepo = mypr.AutoAccountAllowFullRepo
+		a.AllowNodeAcocuntKey = mypr.AutoAccountAllowNodeAcocuntKey
+		a.MaxDiskSpace = mypr.AutoAccountMaxDiskSpace
+		a.MaxNodes = mypr.AutoAccountMaxNodes
+		a.Enabled = true
+		err := db.StoreAccount(&a)
+		if err != nil {
+			log.Printf("Failed to auto-create account: %s\n", err)
+		}
+		var na gripdata.NodeAccount
+		na.AccountID = a.AccountID
+		na.Enabled = true
+		na.NodeID = target
+		err = db.StoreNodeAccount(&na)
+		if err != nil {
+			log.Printf("Failed to auto-create account: %s\n", err)
+		}
+	}
 }
 
 //SendAllToAllKey sends new data to all nodes on share list
@@ -100,6 +131,7 @@ func FindAllToShareWithFromKey(k string, db NodeNetdb) [][]byte {
 	var s [][]byte
 	kl := db.ListShareNodeKey(k)
 	for _, sn := range kl {
+		s = append(s, sn.NodeID)
 		s = append(s, FindAllToShareWith(sn.NodeID, db)...)
 	}
 	return s
@@ -135,9 +167,17 @@ func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
 	shl := db.ListShareNodeInfo(from)
 	km := make(map[string]bool)
 	for _, sr := range shl {
+		n := db.GetNode(sr.NodeID)
 		nd := db.GetNode(sr.TargetNodeID)
-		if nd != nil {
-			err := CreateNewSend(nd, to, db)
+		if nd != nil && n != nil {
+			//FIXME: You'll send the same node data more than once. :/
+			//Although after the first is sent it should remove all matcing
+			//SendData from the db
+			err := CreateNewSend(n, to, db)
+			if err != nil {
+				return err
+			}
+			err = CreateNewSend(nd, to, db)
 			if err != nil {
 				return err
 			}

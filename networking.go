@@ -167,6 +167,7 @@ func (s *SocketController) listenRoutine() {
 			ctrl.DB = s.DB
 			ctrl.Incoming = true
 			ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+			ctrl.Pending = make(map[string]bool)
 			s.addConnection(&ctrl)
 			go ctrl.ConnectionReadRoutine()
 			go ctrl.ConnectionWriteRoutine()
@@ -191,6 +192,7 @@ func (s *SocketController) connectRoutine() {
 					ctrl.DB = s.DB
 					ctrl.Incoming = false
 					ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+					ctrl.Pending = make(map[string]bool)
 					s.addConnection(&ctrl)
 					go ctrl.ConnectionReadRoutine()
 					go ctrl.ConnectionWriteRoutine()
@@ -202,6 +204,7 @@ func (s *SocketController) connectRoutine() {
 				}
 			}
 		}
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -214,6 +217,7 @@ type ConnectionController struct {
 	Incoming   bool
 	DB         NodeNetAccountdb
 	SocketCtrl *SocketController
+	Pending    map[string]bool
 }
 
 //CheckDig check if a node has a digest you want to send it
@@ -229,7 +233,8 @@ type RespDig struct {
 
 //SendDig actually send this data
 type SendDig struct {
-	Dig []byte
+	HaveIt bool
+	Dig    []byte
 }
 
 //Close a connection
@@ -258,9 +263,13 @@ func (ctrl *ConnectionController) sendFromDatabase() (int, error) {
 
 func (ctrl *ConnectionController) sendSendDataList(sl []gripdata.SendData) error {
 	for _, v := range sl {
-		var cd CheckDig
-		cd.Dig = v.Dig
-		ctrl.C.Send(cd)
+		ds := base64.StdEncoding.EncodeToString(v.Dig)
+		if !ctrl.Pending[ds] {
+			var cd CheckDig
+			cd.Dig = v.Dig
+			ctrl.C.Send(cd)
+			ctrl.Pending[ds] = true
+		}
 	}
 	return nil
 }
@@ -281,6 +290,7 @@ func (ctrl *ConnectionController) sendSendData(d []byte) error {
 }
 
 func (ctrl *ConnectionController) deleteSendData(d []byte) error {
+	defer delete(ctrl.Pending, base64.StdEncoding.EncodeToString(d))
 	return ctrl.DB.DeleteSendData(d, ctrl.C.GetNodeID())
 }
 
@@ -313,7 +323,11 @@ func (ctrl *ConnectionController) ConnectionWriteRoutine() {
 				} else {
 					switch v := r.(type) {
 					case SendDig:
-						err = ctrl.sendSendData(v.Dig)
+						if v.HaveIt {
+							ctrl.deleteSendData(v.Dig)
+						} else {
+							err = ctrl.sendSendData(v.Dig)
+						}
 					case bool:
 						c, err = ctrl.sendFromDatabase()
 					default:
@@ -348,25 +362,38 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 				rsp.HaveIt = (t != nil)
 				ctrl.SendChan <- rsp
 			case RespDig:
-				if v.HaveIt {
-					ctrl.deleteSendData(v.Dig)
-				} else {
-					var sd SendDig
-					sd.Dig = v.Dig
-					ctrl.SendChan <- sd
-				}
+				var sd SendDig
+				sd.Dig = v.Dig
+				sd.HaveIt = v.HaveIt
+				ctrl.SendChan <- sd
 			case *gripdata.Node:
-				log.Println("Node data received")
 				err = IncomingNode(v, ctrl.DB)
+				if err == nil {
+					log.Println("Node data received")
+				} else {
+					log.Printf("Node data received: %s\n", err)
+				}
 			case *gripdata.AssociateNodeAccountKey:
-				log.Println("AssociateNodeAccountKey data received")
 				err = IncomingNodeAccountKey(v, ctrl.DB)
+				if err == nil {
+					log.Println("AssociateNodeAccountKey data received")
+				} else {
+					log.Printf("AssociateNodeAccountKey data received: %s\n", err)
+				}
 			case *gripdata.UseShareNodeKey:
-				log.Println("UseShareNodeKey data received")
 				err = IncomingUseShareNodeKey(v, ctrl.DB)
+				if err == nil {
+					log.Println("UseShareNodeKey data received")
+				} else {
+					log.Printf("UseShareNodeKey data received: %s\n", err)
+				}
 			case *gripdata.ShareNodeInfo:
-				log.Println("ShareNodeInfo data received")
 				err = IncomingShareNode(v, ctrl.DB)
+				if err == nil {
+					log.Printf("ShareNodeInfo data received\n")
+				} else {
+					log.Printf("ShareNodeInfo data received, err? %s\n", err)
+				}
 			}
 		}
 		d, err = ctrl.C.Read()
