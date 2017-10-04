@@ -136,16 +136,18 @@ func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
 	km := make(map[string]bool)
 	for _, sr := range shl {
 		nd := db.GetNode(sr.TargetNodeID)
-		err := CreateNewSend(nd, to, db)
-		if err != nil {
-			return err
-		}
-		err = CreateNewSend(&sr, to, db)
-		if err != nil {
-			return err
-		}
-		if sr.Key != "" {
-			km[sr.Key] = true
+		if nd != nil {
+			err := CreateNewSend(nd, to, db)
+			if err != nil {
+				return err
+			}
+			err = CreateNewSend(&sr, to, db)
+			if err != nil {
+				return err
+			}
+			if sr.Key != "" {
+				km[sr.Key] = true
+			}
 		}
 	}
 	for k := range km {

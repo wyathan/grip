@@ -3,6 +3,7 @@ package grip
 import (
 	"encoding/base64"
 	"log"
+	"reflect"
 	"sync"
 	"time"
 
@@ -53,6 +54,14 @@ type SocketController struct {
 	S           Socket
 	Done        bool
 	DB          NodeNetAccountdb
+}
+
+func NewSocketController(sock Socket, db NodeNetAccountdb) *SocketController {
+	var s SocketController
+	s.S = sock
+	s.DB = db
+	s.Connections = make(map[string]*ConnectionController)
+	return &s
 }
 
 func (s *SocketController) addConnection(c *ConnectionController) bool {
@@ -167,10 +176,32 @@ func (s *SocketController) listenRoutine() {
 }
 
 func (s *SocketController) connectRoutine() {
+	log.Printf("Starting connectRoutine")
 	for !s.Done {
 		//Check max connections
-		
-		cl := s.DB.GetConnectableNodesWithSendData()
+		nm := s.numberConnections()
+		if nm <= MAXCONNECTIONS {
+			cl := s.DB.GetConnectableNodesWithSendData(MAXCONNECTIONATTEMPTS, uint64(time.Now().UnixNano()))
+			for _, c := range cl {
+				n := s.DB.GetNode(c.ID)
+				con, err := s.S.ConnectTo(n)
+				if con != nil && err == nil {
+					var ctrl ConnectionController
+					ctrl.C = con
+					ctrl.DB = s.DB
+					ctrl.Incoming = false
+					ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+					s.addConnection(&ctrl)
+					go ctrl.ConnectionReadRoutine()
+					go ctrl.ConnectionWriteRoutine()
+				} else {
+					nt := uint64(time.Now().UnixNano())
+					c.LastConnAttempt = nt
+					c.NextAttempt = nt + ((nt - c.LastConnection) / 2)
+					s.DB.StoreNodeEphemera(&c)
+				}
+			}
+		}
 	}
 }
 
@@ -306,9 +337,10 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 	d, err := ctrl.C.Read()
 	for err == nil {
 		if d != nil {
+			log.Printf("Incoming type: %s\n", reflect.TypeOf(d).String())
 			switch v := d.(type) {
 			default:
-				log.Printf("Unknown type: %s\n", v)
+				log.Printf("Unknown type: %s\n", reflect.TypeOf(v).String())
 			case CheckDig:
 				t := ctrl.DB.GetDigestData(v.Dig)
 				var rsp RespDig
@@ -323,18 +355,18 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 					sd.Dig = v.Dig
 					ctrl.SendChan <- sd
 				}
-			case gripdata.Node:
+			case *gripdata.Node:
 				log.Println("Node data received")
-				err = IncomingNode(&v, ctrl.DB)
-			case gripdata.AssociateNodeAccountKey:
+				err = IncomingNode(v, ctrl.DB)
+			case *gripdata.AssociateNodeAccountKey:
 				log.Println("AssociateNodeAccountKey data received")
-				err = IncomingNodeAccountKey(&v, ctrl.DB)
-			case gripdata.UseShareNodeKey:
+				err = IncomingNodeAccountKey(v, ctrl.DB)
+			case *gripdata.UseShareNodeKey:
 				log.Println("UseShareNodeKey data received")
-				err = IncomingUseShareNodeKey(&v, ctrl.DB)
-			case gripdata.ShareNodeInfo:
+				err = IncomingUseShareNodeKey(v, ctrl.DB)
+			case *gripdata.ShareNodeInfo:
 				log.Println("ShareNodeInfo data received")
-				err = IncomingShareNode(&v, ctrl.DB)
+				err = IncomingShareNode(v, ctrl.DB)
 			}
 		}
 		d, err = ctrl.C.Read()
