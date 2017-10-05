@@ -1,6 +1,7 @@
 package griptests
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"testing"
@@ -69,6 +70,7 @@ func TestNodeShare(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	log.Printf("Created node 1 to node 0 ShareNodeInfo: %s\n", base64.StdEncoding.EncodeToString(shr.GetDig()))
 	time.Sleep(2 * time.Second)
 	var ks gripdata.UseShareNodeKey
 	ks.Key = shr.Key
@@ -77,7 +79,8 @@ func TestNodeShare(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	time.Sleep(5 * time.Second)
+	log.Printf("Created node 2 to node 0 UseShareNodeKey: %s\n", base64.StdEncoding.EncodeToString(ks.GetDig()))
+	time.Sleep(2 * time.Second)
 
 	if 3 != len(dbs[0].Nodes) {
 		t.Errorf("Missing nodes %d", len(dbs[0].Nodes))
@@ -89,6 +92,138 @@ func TestNodeShare(t *testing.T) {
 		t.Errorf("Missing nodes %d", len(dbs[2].Nodes))
 	}
 	if 2 != len(dbs[3].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[3].Nodes))
+	}
+	if 2 != len(dbs[4].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[4].Nodes))
+	}
+	if 2 != len(dbs[5].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[5].Nodes))
+	}
+	if 2 != len(dbs[6].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[6].Nodes))
+	}
+	if 2 != len(dbs[7].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[7].Nodes))
+	}
+	if 2 != len(dbs[8].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[8].Nodes))
+	}
+	if 2 != len(dbs[9].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[9].Nodes))
+	}
+
+	var shr3 gripdata.ShareNodeInfo
+	shr3.Key = "node3sharekey"
+	shr3.NodeID = nodes[3].ID
+	shr3.TargetNodeID = nodes[0].ID
+	err = grip.NewShareNode(&shr3, dbs[3])
+	if err != nil {
+		t.Error(err)
+	}
+	log.Printf("Created node 3 to node 0 ShareNodeInfo: %s\n", base64.StdEncoding.EncodeToString(shr3.GetDig()))
+
+	time.Sleep(2 * time.Second)
+
+	if 4 != len(dbs[0].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[0].Nodes))
+	}
+	if 3 != len(dbs[1].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[1].Nodes))
+	}
+	if 3 != len(dbs[2].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[2].Nodes))
+	}
+	if 2 != len(dbs[3].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[3].Nodes))
+	}
+	if 2 != len(dbs[4].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[4].Nodes))
+	}
+	if 2 != len(dbs[5].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[5].Nodes))
+	}
+	if 2 != len(dbs[6].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[6].Nodes))
+	}
+	if 2 != len(dbs[7].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[7].Nodes))
+	}
+	if 2 != len(dbs[8].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[8].Nodes))
+	}
+	if 2 != len(dbs[9].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[9].Nodes))
+	}
+
+	//var ks2 gripdata.UseShareNodeKey
+	//ks2.Key = shr.Key
+	//ks2.TargetID = nodes[0].ID
+	//err = grip.NewUseShareNodeKey(&ks2, dbs[3])
+	var ks2 gripdata.UseShareNodeKey
+	ks2.Key = "node3sharekey"
+	ks2.TargetID = nodes[0].ID
+	err = grip.NewUseShareNodeKey(&ks2, dbs[1])
+	if err != nil {
+		t.Error(err)
+	}
+	log.Printf("Created node 1 to node 3 UseShareNodeKey: %s\n", base64.StdEncoding.EncodeToString(ks2.GetDig()))
+
+	time.Sleep(2 * time.Second)
+
+	if 4 != len(dbs[0].Nodes) { //0,1,2,3
+		t.Errorf("Missing nodes %d", len(dbs[0].Nodes))
+	}
+	if 4 != len(dbs[1].Nodes) { //0,1,2,3
+		t.Errorf("Missing nodes %d", len(dbs[1].Nodes))
+	}
+	if 3 != len(dbs[2].Nodes) { //0,1,2
+		t.Errorf("Missing nodes %d", len(dbs[2].Nodes))
+	}
+	if 3 != len(dbs[3].Nodes) { //0,1,3
+		t.Errorf("Missing nodes %d", len(dbs[3].Nodes))
+	}
+	if 2 != len(dbs[4].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[4].Nodes))
+	}
+	if 2 != len(dbs[5].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[5].Nodes))
+	}
+	if 2 != len(dbs[6].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[6].Nodes))
+	}
+	if 2 != len(dbs[7].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[7].Nodes))
+	}
+	if 2 != len(dbs[8].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[8].Nodes))
+	}
+	if 2 != len(dbs[9].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[9].Nodes))
+	}
+
+	var shr4 gripdata.ShareNodeInfo
+	shr4.Key = "another1key"
+	shr4.NodeID = nodes[1].ID
+	shr4.TargetNodeID = nodes[3].ID
+	err = grip.NewShareNode(&shr4, dbs[1])
+	if err != nil {
+		t.Error(err)
+	}
+	log.Printf("Created node 1 to node 3 ShareNodeInfo: %s\n", base64.StdEncoding.EncodeToString(shr4.GetDig()))
+
+	time.Sleep(2 * time.Second)
+
+	if 4 != len(dbs[0].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[0].Nodes))
+	}
+	if 4 != len(dbs[1].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[1].Nodes))
+	}
+	if 4 != len(dbs[2].Nodes) {
+		t.Errorf("Missing nodes %d", len(dbs[2].Nodes))
+	}
+	if 4 != len(dbs[3].Nodes) {
 		t.Errorf("Missing nodes %d", len(dbs[3].Nodes))
 	}
 	if 2 != len(dbs[4].Nodes) {

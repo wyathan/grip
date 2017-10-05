@@ -148,7 +148,16 @@ func (c *TestConnection) Send(d interface{}) error {
 		return errors.New("Connection closed")
 	}
 	c.WriteC <- d
-	log.Printf("SEND FROM: %d TO: %d %s\n", c.LclIndex, c.RmtIndex, reflect.TypeOf(d).String())
+	switch v := d.(type) {
+	default:
+		log.Printf("SEND FROM %d TO: %d %s\n", c.LclIndex, c.RmtIndex, reflect.TypeOf(d).String())
+	case *gripdata.Node:
+		log.Printf("NETWORK SEND FROM %d TO: %d Node dig: %s\n", c.LclIndex, c.RmtIndex, base64.StdEncoding.EncodeToString(v.GetDig()))
+	case *gripdata.ShareNodeInfo:
+		log.Printf("NETWORK SEND FROM %d TO: %d ShareNodeInfo dig: %s\n", c.LclIndex, c.RmtIndex, base64.StdEncoding.EncodeToString(v.GetDig()))
+	case *gripdata.UseShareNodeKey:
+		log.Printf("NETWORK SEND FROM %d TO: %d UseShareNodeKey dig: %s\n", c.LclIndex, c.RmtIndex, base64.StdEncoding.EncodeToString(v.GetDig()))
+	}
 	return nil
 }
 

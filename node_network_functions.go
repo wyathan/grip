@@ -43,7 +43,7 @@ func IncomingNode(n *gripdata.Node, db NodeNetAccountdb) error {
 		return errors.New("Account is not enabled")
 	}
 	//Find all ShareNodeInfo for this node
-	err = SendAllToShareWith(n, db)
+	err = SendAllToShareWithMe(n, db)
 	if err != nil {
 		return err
 	}
@@ -101,20 +101,23 @@ func IncomingShareNode(s *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 	//First send their node data, so that they can validate the signature
 	//of the ShareNodeInfo
 	n := db.GetNode(s.NodeID)
-	err = SendAllToShareWith(n, db)
+	err = SendAllToShareWithMe(n, db)
 	if err != nil {
 		return err
 	}
 
 	//Send the target node data
 	gn := db.GetNode(tn)
-	err = SendAllToShareWith(gn, db)
+	if gn == nil {
+		return errors.New("I don't know the target node for this ShareNodeInfo")
+	}
+	err = SendAllToShareWith(gn, n.ID, db)
 	if err != nil {
 		return err
 	}
 
 	//Now send ShareNodeInfo.
-	err = SendAllToShareWith(s, db)
+	err = SendAllToShareWithMe(s, db)
 	if err != nil {
 		return err
 	}

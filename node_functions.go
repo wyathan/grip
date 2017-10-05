@@ -36,15 +36,11 @@ func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
-	nd := db.GetNode(id)
-	if nd == nil {
-		return errors.New("This node is not found")
-	}
-	err = SendAllToShareWith(nd, db)
+	err = SendAllToShareWithMe(myn, db)
 	if err != nil {
 		return err
 	}
-	err = SendAllToShareWith(n, db)
+	err = SendAllToShareWithMe(n, db)
 	if err != nil {
 		return err
 	}
@@ -71,10 +67,6 @@ func NewUseShareNodeKey(n *gripdata.UseShareNodeKey, db NodeNetdb) error {
 	err = db.StoreUseShareNodeKey(n)
 	if err != nil {
 		return err
-	}
-	nd := db.GetNode(id)
-	if nd == nil {
-		return errors.New("This node is not found")
 	}
 	err = CreateNewSend(n, n.TargetID, db)
 	if err != nil {
@@ -209,7 +201,19 @@ func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
 }
 
 //SendAllToShareWith sends new data to all nodes on share list
-func SendAllToShareWith(s gripcrypto.SignInf, db NodeNetdb) error {
+func SendAllToShareWith(s gripcrypto.SignInf, sourceid []byte, db NodeNetdb) error {
+	shl := FindAllToShareWith(sourceid, db)
+	for _, sh := range shl {
+		err := CreateNewSend(s, sh, db)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//SendAllToShareWithMe sends new data to all nodes the source has shared with
+func SendAllToShareWithMe(s gripcrypto.SignInf, db NodeNetdb) error {
 	shl := FindAllToShareWith(s.GetNodeID(), db)
 	for _, sh := range shl {
 		err := CreateNewSend(s, sh, db)
