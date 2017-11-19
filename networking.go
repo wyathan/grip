@@ -237,6 +237,11 @@ type SendDig struct {
 	Dig    []byte
 }
 
+//RejectDig indicates this digest was rejected by the receving node
+type RejectDig struct {
+	Dig []byte
+}
+
 //Close a connection
 func (ctrl *ConnectionController) Close() {
 	ctrl.Lock()
@@ -292,6 +297,24 @@ func (ctrl *ConnectionController) sendSendData(d []byte) error {
 func (ctrl *ConnectionController) deleteSendData(d []byte) error {
 	defer delete(ctrl.Pending, base64.StdEncoding.EncodeToString(d))
 	return ctrl.DB.DeleteSendData(d, ctrl.C.GetNodeID())
+}
+
+func (ctrl *ConnectionController) sendDataRejected(d []byte) error {
+	var r RejectDig
+	r.Dig = d
+	return ctrl.C.Send(r)
+}
+
+func (ctrl *ConnectionController) storeDataRejected(d []byte) error {
+	r := gripdata.RejectedSendData{}
+	r.Dig = d
+	r.TargetID = ctrl.C.GetNodeID()
+	r.Timestamp = uint64(time.Now().UnixNano())
+	err := ctrl.DB.StoreRejectedSendData(&r)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //ConnectionWriteRoutine go routine to write to connections
@@ -366,33 +389,42 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 				sd.Dig = v.Dig
 				sd.HaveIt = v.HaveIt
 				ctrl.SendChan <- sd
+			case RejectDig:
+				err = ctrl.storeDataRejected(v.Dig)
+				if err != nil {
+					log.Printf("Failed to save rejected data record! %s\n", err)
+				}
 			case *gripdata.Node:
 				err = IncomingNode(v, ctrl.DB)
 				if err == nil {
 					log.Println("Node data received")
 				} else {
-					log.Printf("Node data received: %s\n", err)
+					log.Printf("Node data error: %s\n", err)
+					ctrl.sendDataRejected(v.Dig)
 				}
 			case *gripdata.AssociateNodeAccountKey:
 				err = IncomingNodeAccountKey(v, ctrl.DB)
 				if err == nil {
 					log.Println("AssociateNodeAccountKey data received")
 				} else {
-					log.Printf("AssociateNodeAccountKey data received: %s\n", err)
+					log.Printf("AssociateNodeAccountKey data error: %s\n", err)
+					ctrl.sendDataRejected(v.Dig)
 				}
 			case *gripdata.UseShareNodeKey:
 				err = IncomingUseShareNodeKey(v, ctrl.DB)
 				if err == nil {
 					log.Println("UseShareNodeKey data received")
 				} else {
-					log.Printf("UseShareNodeKey data received: %s\n", err)
+					log.Printf("UseShareNodeKey data error: %s\n", err)
+					ctrl.sendDataRejected(v.Dig)
 				}
 			case *gripdata.ShareNodeInfo:
 				err = IncomingShareNode(v, ctrl.DB)
 				if err == nil {
 					log.Printf("ShareNodeInfo data received\n")
 				} else {
-					log.Printf("ShareNodeInfo data received, err? %s\n", err)
+					log.Printf("ShareNodeInfo data error, err? %s\n", err)
+					ctrl.sendDataRejected(v.Dig)
 				}
 			}
 		}

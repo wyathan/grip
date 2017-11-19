@@ -10,6 +10,8 @@ type Accountdb interface {
 	GetNodeAccountKey(key string) *gripdata.NodeAccountKey
 	StoreNodeAccount(na *gripdata.NodeAccount) error
 	GetNodeAccount(id []byte) *gripdata.NodeAccount
+	IncrNumberContexts(a *gripdata.Account) error
+	IncrNumberNodes(a *gripdata.Account) error
 }
 
 //Nodedb used for storing/getting node data from db
@@ -29,6 +31,7 @@ type Nodedb interface {
 //Netdb used for network db access
 type Netdb interface {
 	StoreSendData(s *gripdata.SendData) error
+	StoreRejectedSendData(s *gripdata.RejectedSendData) error
 	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
 	//                                                           WARNING! Must be sorted by Timestamp
 	DeleteSendData(d []byte, to []byte) error //Data has been setnt to the node
@@ -41,6 +44,42 @@ type Netdb interface {
 	GetAllConnected() []gripdata.NodeEphemera
 	GetNodeEphemera(id []byte) *gripdata.NodeEphemera
 	StoreNodeEphemera(ne *gripdata.NodeEphemera) error
+}
+
+//Contextdb sotre/load context data
+type Contextdb interface {
+	StoreContext(c *gripdata.Context) error
+	GetContext(id []byte) *gripdata.Context
+	GetContextRequests(id []byte) []gripdata.ContextRequest
+	StoreContextRequest(c *gripdata.ContextRequest) error
+	GetContextRequest(cid []byte, tgtid []byte) *gripdata.ContextRequest
+	StoreContextResponse(c *gripdata.ContextResponse) error
+	GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextResponse
+	GetContextResponses(cid []byte) []gripdata.ContextResponse
+	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
+	//Never ever be able to access these as valid data!  Only for debug!
+	StoreVeryBadContextFile(c *gripdata.ContextFile) error
+	StoreContextFile(c *gripdata.ContextFile) error
+}
+
+//NodeContextdb implements both Nodedb and Contextdb
+type NodeContextdb interface {
+	Nodedb
+	Contextdb
+}
+
+//NodeNetConextdb implements node, net, and context dbs
+type NodeNetConextdb interface {
+	Nodedb
+	Netdb
+	Contextdb
+}
+
+type NodeNetAccountContextdb interface {
+	Nodedb
+	Netdb
+	Contextdb
+	Accountdb
 }
 
 //NodeAccountdb implements both Nodedb and Accountdb

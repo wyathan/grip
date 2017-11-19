@@ -12,20 +12,27 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
+//TestDB is that
 type TestDB struct {
 	sync.Mutex
-	LclNode        *gripdata.Node
-	LclPrvNodeData *gripdata.MyNodePrivateData
-	Accounts       map[string]*gripdata.Account
-	AccountKeys    map[string]*gripdata.NodeAccountKey
-	NodeAccounts   map[string]*gripdata.NodeAccount
-	Nodes          map[string]*gripdata.Node
-	ShareNodes     map[string][]gripdata.ShareNodeInfo
-	ShareNodeKeys  map[string][]gripdata.ShareNodeInfo
-	UseShareKeys   map[string][]gripdata.UseShareNodeKey
-	SendData       map[string][]gripdata.SendData
-	DigData        map[string]interface{}
-	NodeEphemera   map[string]*gripdata.NodeEphemera
+	LclNode             *gripdata.Node
+	LclPrvNodeData      *gripdata.MyNodePrivateData
+	Accounts            map[string]*gripdata.Account
+	AccountKeys         map[string]*gripdata.NodeAccountKey
+	NodeAccounts        map[string]*gripdata.NodeAccount
+	Nodes               map[string]*gripdata.Node
+	ShareNodes          map[string][]gripdata.ShareNodeInfo
+	ShareNodeKeys       map[string][]gripdata.ShareNodeInfo
+	UseShareKeys        map[string][]gripdata.UseShareNodeKey
+	SendData            map[string][]gripdata.SendData
+	DigData             map[string]interface{}
+	NodeEphemera        map[string]*gripdata.NodeEphemera
+	Contexts            map[string]*gripdata.Context
+	ContextRequests     map[string][]gripdata.ContextRequest
+	ContextResponses    map[string]map[string]*gripdata.ContextResponse
+	ContextFiles        map[string][]gripdata.ContextFile
+	RejectedData        map[string][]gripdata.RejectedSendData
+	VeryBadContextFiles []gripdata.ContextFile
 }
 
 func NewTestDB() *TestDB {
@@ -40,6 +47,12 @@ func NewTestDB() *TestDB {
 	t.SendData = make(map[string][]gripdata.SendData)
 	t.DigData = make(map[string]interface{})
 	t.NodeEphemera = make(map[string]*gripdata.NodeEphemera)
+	t.Contexts = make(map[string]*gripdata.Context)
+	t.ContextRequests = make(map[string][]gripdata.ContextRequest)
+	t.ContextResponses = make(map[string]map[string]*gripdata.ContextResponse)
+	t.ContextFiles = make(map[string][]gripdata.ContextFile)
+	t.RejectedData = make(map[string][]gripdata.RejectedSendData)
+
 	return &t
 }
 
@@ -72,6 +85,20 @@ func (t *TestDB) StoreAccount(a *gripdata.Account) error {
 		t.Accounts = make(map[string]*gripdata.Account)
 	}
 	t.Accounts[a.AccountID] = a
+	return nil
+}
+func (t *TestDB) IncrNumberContexts(a *gripdata.Account) error {
+	t.Lock()
+	defer t.Unlock()
+	ua := t.Accounts[a.AccountID]
+	ua.NumberContexts++
+	return nil
+}
+func (t *TestDB) IncrNumberNodes(a *gripdata.Account) error {
+	t.Lock()
+	defer t.Unlock()
+	ua := t.Accounts[a.AccountID]
+	ua.NumberNodes++
 	return nil
 }
 func (t *TestDB) GetAccount(s string) *gripdata.Account {
@@ -266,10 +293,118 @@ func (t *TestDB) StoreNodeEphemera(ne *gripdata.NodeEphemera) error {
 	t.NodeEphemera[tk] = ne
 	return nil
 }
+func (t *TestDB) StoreContext(c *gripdata.Context) error {
+	t.Lock()
+	defer t.Unlock()
+	id := base64.StdEncoding.EncodeToString(c.Dig)
+	t.Contexts[id] = c
+	return nil
+}
+func (t *TestDB) GetContext(id []byte) *gripdata.Context {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(id)
+	return t.Contexts[sid]
+}
+func (t *TestDB) GetContextRequests(id []byte) []gripdata.ContextRequest {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(id)
+	return t.ContextRequests[sid]
+}
+func (t *TestDB) StoreContextRequest(c *gripdata.ContextRequest) error {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(c.Dig)
+	t.ContextRequests[sid] = append(t.ContextRequests[sid], *c)
+	return nil
+}
+func (t *TestDB) GetContextRequest(cid []byte, tgtid []byte) *gripdata.ContextRequest {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	tar := t.ContextRequests[scid]
+	for _, cr := range tar {
+		if bytes.Equal(tgtid, cr.TargetNodeID) {
+			return &cr
+		}
+	}
+	return nil
+}
+func (t *TestDB) StoreContextResponse(c *gripdata.ContextResponse) error {
+	t.Lock()
+	defer t.Unlock()
+	cid := base64.StdEncoding.EncodeToString(c.ContextDig)
+	tid := base64.StdEncoding.EncodeToString(c.TargetNodeID)
+	m := t.ContextResponses[cid]
+	if m == nil {
+		m = make(map[string]*gripdata.ContextResponse)
+		t.ContextResponses[cid] = m
+	}
+	m[tid] = c
+	return nil
+}
 
+func (t *TestDB) GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextResponse {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	stid := base64.StdEncoding.EncodeToString(tgtid)
+	rsp := t.ContextResponses[scid]
+	if rsp != nil {
+		return rsp[stid]
+	}
+	return nil
+}
+
+func (t *TestDB) GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile {
+	t.Lock()
+	defer t.Unlock()
+	return nil
+}
+
+func (t *TestDB) GetContextResponses(cid []byte) []gripdata.ContextResponse {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(cid)
+	rm := t.ContextResponses[sid]
+	var r []gripdata.ContextResponse
+	for _, v := range rm {
+		r = append(r, *v)
+	}
+	return nil
+}
+
+func (t *TestDB) StoreContextFile(c *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	cid := base64.StdEncoding.EncodeToString(c.Context)
+	fl := t.ContextFiles[cid]
+	t.ContextFiles[cid] = append(fl, *c)
+	t.addDig(c)
+	return nil
+}
+
+func (t *TestDB) StoreRejectedSendData(s *gripdata.RejectedSendData) error {
+	t.Lock()
+	defer t.Unlock()
+	nid := base64.StdEncoding.EncodeToString(s.TargetID)
+	r := t.RejectedData[nid]
+	t.RejectedData[nid] = append(r, *s)
+	return nil
+}
+
+func (t *TestDB) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	t.VeryBadContextFiles = append(t.VeryBadContextFiles, *c)
+	return nil
+}
+
+//testTestDBImplements make sure we implement the interfaces
 func testTestDBImplements() {
 	var t TestDB
-	var s grip.NodeNetAccountdb
+	var s grip.NodeNetAccountContextdb
 	s = &t
 	s.GetAccount("")
 }

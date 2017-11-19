@@ -19,4 +19,8 @@ type MyNodePrivateData struct {
 	AutoAccountAllowContextNode    bool   //Allow adding new nodes to contexts
 	AutoAccountAllowNodeAcocuntKey bool   //Allow use of NodeAccountKeys to assocate with this account
 	AutoAccountAllowCacheMode      uint32 //Which cache modes are available
+
+	AutoContextResponse bool //Automatically reply to context requests
+	//The account data specifies how we respond to a node's request
+
 }

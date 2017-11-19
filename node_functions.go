@@ -1,6 +1,7 @@
 package grip
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha512"
 	"errors"
@@ -225,7 +226,11 @@ func SendAllToShareWithMe(s gripcrypto.SignInf, db NodeNetdb) error {
 }
 
 //CreateNewSend indicates this data should be sent to this node
-func CreateNewSend(v gripcrypto.SignInf, sendto []byte, db Netdb) error {
+func CreateNewSend(v gripcrypto.SignInf, sendto []byte, db NodeNetdb) error {
+	me, _ := db.GetPrivateNodeData()
+	if bytes.Equal(sendto, me.ID) {
+		return nil
+	}
 	var s gripdata.SendData
 	s.Dig = v.GetDig()
 	s.TargetID = sendto

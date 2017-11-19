@@ -39,7 +39,7 @@ func IncomingNode(n *gripdata.Node, db NodeNetAccountdb) error {
 		return err
 	}
 	createAutoAccount(pr, n.ID, db)
-	if !CheckAccountEnabled(n, db) {
+	if !IsAccountEnabled(n, db) {
 		return errors.New("Account is not enabled")
 	}
 	//Find all ShareNodeInfo for this node
@@ -66,7 +66,7 @@ func IncomingShareNode(s *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
 		return err
 	}
 	createAutoAccount(pr, s.NodeID, db)
-	if !CheckAccountEnabled(s, db) {
+	if !IsAccountEnabled(s, db) {
 		return errors.New("Node account is not enabled")
 	}
 	err = db.StoreShareNodeInfo(s)
@@ -145,7 +145,7 @@ func IncomingUseShareNodeKey(k *gripdata.UseShareNodeKey, db NodeNetAccountdb) e
 		return err
 	}
 	createAutoAccount(pr, k.NodeID, db)
-	if !CheckAccountEnabled(k, db) {
+	if !IsAccountEnabled(k, db) {
 		return errors.New("Node account is not enabled")
 	}
 	err = db.StoreUseShareNodeKey(k)
@@ -197,15 +197,14 @@ func GetNodeAccount(id []byte, db Accountdb) *gripdata.Account {
 	if na == nil {
 		return nil
 	}
-	log.Printf("FOUND ACCOUNT: %s\n", na.AccountID)
 	if !na.Enabled {
 		return nil
 	}
 	return db.GetAccount(na.AccountID)
 }
 
-//CheckIDAccountEnabled see if this node id has account enabled
-func CheckIDAccountEnabled(id []byte, db Accountdb) bool {
+//IsIDAccountEnabled see if this node id has account enabled
+func IsIDAccountEnabled(id []byte, db Accountdb) bool {
 	a := GetNodeAccount(id, db)
 	if a == nil {
 		return false
@@ -213,9 +212,9 @@ func CheckIDAccountEnabled(id []byte, db Accountdb) bool {
 	return a.Enabled
 }
 
-//CheckAccountEnabled see if this signInf has account enabled
-func CheckAccountEnabled(s gripcrypto.SignInf, db Accountdb) bool {
-	return CheckIDAccountEnabled(s.GetNodeID(), db)
+//IsAccountEnabled see if this signInf has account enabled
+func IsAccountEnabled(s gripcrypto.SignInf, db Accountdb) bool {
+	return IsIDAccountEnabled(s.GetNodeID(), db)
 }
 
 //IncomingNodeAccountKey process incoming ShareNodeInfoKeys
@@ -248,8 +247,7 @@ func IncomingNodeAccountKey(s *gripdata.AssociateNodeAccountKey, db NodeAccountd
 	if a.NumberNodes >= a.MaxNodes {
 		return errors.New("Maximum number of nodes for account reached")
 	}
-	a.NumberNodes++
-	err = db.StoreAccount(a)
+	err = db.IncrNumberNodes(a)
 	if err != nil {
 		return err
 	}
