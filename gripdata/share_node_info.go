@@ -12,9 +12,11 @@ type ShareNodeInfo struct {
 	TargetNodeID []byte //The node that can know about NodeID
 	NodeID       []byte //The id of the node data to share
 	MetaData     string //Generic metadata string
-	Key          string
-	Dig          []byte //This record's digest
-	Sig          []byte //Signed by NodeID private key
+	//If node A sends the TargetNode a UseShareNodeKey that matches Key,
+	//node A then has permission to get this ShareNodeInfo about NodeID
+	Key string
+	Dig []byte //This record's digest
+	Sig []byte //Signed by NodeID private key
 }
 
 //Digest ShareNodeInfo

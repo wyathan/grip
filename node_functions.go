@@ -119,7 +119,8 @@ func SendAllToAllKey(s gripcrypto.SignInf, k string, db NodeNetdb) error {
 	return nil
 }
 
-//FindAllToShareWithFromKey get all nodes to send data to based on key
+//FindAllToShareWithFromKey get all the nodes that we should send
+//new data to based on a key.
 func FindAllToShareWithFromKey(k string, db NodeNetdb) [][]byte {
 	var s [][]byte
 	kl := db.ListShareNodeKey(k)
@@ -130,7 +131,9 @@ func FindAllToShareWithFromKey(k string, db NodeNetdb) [][]byte {
 	return s
 }
 
-//FindAllToShareWith get all the nodes to share updates about a node
+//FindAllToShareWith get the targets ids from all the ShareNodeInfo's
+//created by id.  Get all the node ids that have created UseShareNodeKey
+//that match any of the keys from the ShareNodeInfo created by id.
 func FindAllToShareWith(id []byte, db NodeNetdb) [][]byte {
 	sl := db.ListShareNodeInfo(id)
 	km := make(map[string]bool)
@@ -162,6 +165,7 @@ func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
 	for _, sr := range shl {
 		n := db.GetNode(sr.NodeID)
 		nd := db.GetNode(sr.TargetNodeID)
+		log.Printf("Sending sharenodeinfo not nil: source node %t, target %t", (nd != nil), (n != nil))
 		if nd != nil && n != nil {
 			//FIXME: You'll send the same node data more than once. :/
 			//Although after the first is sent it should remove all matcing

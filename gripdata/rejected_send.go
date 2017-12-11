@@ -6,4 +6,5 @@ type RejectedSendData struct {
 	TargetID  []byte //The node to send the data to
 	Dig       []byte //The digest of the data to send
 	Timestamp uint64 //The time this was created
+	Message   string
 }

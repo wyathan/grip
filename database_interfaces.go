@@ -12,6 +12,7 @@ type Accountdb interface {
 	GetNodeAccount(id []byte) *gripdata.NodeAccount
 	IncrNumberContexts(a *gripdata.Account) error
 	IncrNumberNodes(a *gripdata.Account) error
+	CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error
 }
 
 //Nodedb used for storing/getting node data from db
@@ -41,9 +42,19 @@ type Netdb interface {
 	//NodeEphemera.NextAttempt <= curtime
 	//exists some SendData.TargetID == NodeEphemera.ID
 	GetConnectableNodesWithSendData(max int, curtime uint64) []gripdata.NodeEphemera
+	//Get nodes that are connectable that we have sent a ShareNodeInfo with a Key,
+	//So we can get new UseShareNodeKeys that may have been submitted to that node.
+	GetConnectableNodesWithShareNodeKey(max int, curtime uint64) []gripdata.NodeEphemera
+	//Get nodes that we have sent a UseShareNodeKey so we can connect to them
+	//if they are connectable
+	GetConnectableUseShareKeyNodes(max int, curtime uint64) []gripdata.NodeEphemera
+	GetConnectableAny(max int, curtime uint64) []gripdata.NodeEphemera
 	GetAllConnected() []gripdata.NodeEphemera
-	GetNodeEphemera(id []byte) *gripdata.NodeEphemera
-	StoreNodeEphemera(ne *gripdata.NodeEphemera) error
+	CreateNodeEphemera(id []byte, connectable bool) error
+	SetNodeEphemeraNextConnection(id []byte, last uint64, next uint64) error
+	ClearAllConnected()
+	SetNodeEphemeraConnected(incomming bool, id []byte, curtime uint64) error
+	SetNodeEphemeraClosed(id []byte) error
 }
 
 //Contextdb sotre/load context data

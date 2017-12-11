@@ -3,6 +3,7 @@ package griptests
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"log"
 	"reflect"
 	"sync"
@@ -255,14 +256,65 @@ func (t *TestDB) DeleteSendData(d []byte, to []byte) error {
 	t.SendData[tk] = nl
 	return nil
 }
-func (t *TestDB) GetConnectableNodesWithSendData(max int, curtime uint64) []gripdata.NodeEphemera {
+func (t *TestDB) GetConnectableAny(max int, curtime uint64) []gripdata.NodeEphemera {
 	t.Lock()
 	defer t.Unlock()
 	var r []gripdata.NodeEphemera
 	for _, v := range t.NodeEphemera {
 		if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable {
-			tk := base64.StdEncoding.EncodeToString(v.ID)
+			r = append(r, *v)
+		}
+	}
+	return r
+}
+func (t *TestDB) GetConnectableUseShareKeyNodes(max int, curtime uint64) []gripdata.NodeEphemera {
+	t.Lock()
+	defer t.Unlock()
+	var r []gripdata.NodeEphemera
+	for _, snl := range t.UseShareKeys {
+		for _, s := range snl {
+			if bytes.Equal(s.NodeID, t.LclPrvNodeData.ID) {
+				tk := base64.StdEncoding.EncodeToString(s.TargetID)
+				v := t.NodeEphemera[tk]
+				if v != nil {
+					if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable {
+						r = append(r, *v)
+					}
+				}
+			}
+		}
+	}
+	return r
+}
+func (t *TestDB) GetConnectableNodesWithShareNodeKey(max int, curtime uint64) []gripdata.NodeEphemera {
+	t.Lock()
+	defer t.Unlock()
+	ids := base64.StdEncoding.EncodeToString(t.LclPrvNodeData.ID)
+	lk := t.ShareNodes[ids]
+	var r []gripdata.NodeEphemera
+	for _, sn := range lk {
+		if sn.Key != "" {
+			tk := base64.StdEncoding.EncodeToString(sn.TargetNodeID)
+			v := t.NodeEphemera[tk]
+			if v != nil {
+				if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable {
+					r = append(r, *v)
+				}
+			}
+		}
+	}
+	return r
+}
+func (t *TestDB) GetConnectableNodesWithSendData(max int, curtime uint64) []gripdata.NodeEphemera {
+	t.Lock()
+	defer t.Unlock()
+	var r []gripdata.NodeEphemera
+	added := make(map[string]bool)
+	for _, v := range t.NodeEphemera {
+		tk := base64.StdEncoding.EncodeToString(v.ID)
+		if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable && !added[tk] {
 			if len(t.SendData[tk]) > 0 {
+				added[tk] = true
 				r = append(r, *v)
 			}
 		}
@@ -280,24 +332,73 @@ func (t *TestDB) GetAllConnected() []gripdata.NodeEphemera {
 	}
 	return r
 }
-func (t *TestDB) GetNodeEphemera(id []byte) *gripdata.NodeEphemera {
+func (t *TestDB) SetNodeEphemeraConnected(incomming bool, id []byte, curtime uint64) error {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(id)
+	nid := t.NodeEphemera[sid]
+	if nid == nil {
+		var n gripdata.NodeEphemera
+		n.ID = id
+		nid = &n
+		t.NodeEphemera[sid] = nid
+	}
+	nid.Connected = true
+	if incomming {
+		nid.LastConnReceived = curtime
+	} else {
+		nid.LastConnection = curtime
+	}
+	return nil
+}
+func (t *TestDB) SetNodeEphemeraClosed(id []byte) error {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(id)
+	nid := t.NodeEphemera[sid]
+	if nid != nil {
+		nid.Connected = false
+	}
+	return nil
+}
+func (t *TestDB) CreateNodeEphemera(id []byte, connectable bool) error {
 	t.Lock()
 	defer t.Unlock()
 	tk := base64.StdEncoding.EncodeToString(id)
-	return t.NodeEphemera[tk]
+	ep := t.NodeEphemera[tk]
+	if ep == nil {
+		var nep gripdata.NodeEphemera
+		nep.ID = id
+		ep = &nep
+		t.NodeEphemera[tk] = ep
+	}
+	ep.Connectable = connectable
+	return nil
 }
-func (t *TestDB) StoreNodeEphemera(ne *gripdata.NodeEphemera) error {
+func (t *TestDB) SetNodeEphemeraNextConnection(id []byte, last uint64, next uint64) error {
 	t.Lock()
 	defer t.Unlock()
-	tk := base64.StdEncoding.EncodeToString(ne.ID)
-	t.NodeEphemera[tk] = ne
+	tk := base64.StdEncoding.EncodeToString(id)
+	ep := t.NodeEphemera[tk]
+	if ep != nil {
+		ep.LastConnAttempt = last
+		ep.NextAttempt = next
+	}
 	return nil
+}
+func (t *TestDB) ClearAllConnected() {
+	t.Lock()
+	defer t.Unlock()
+	for _, v := range t.NodeEphemera {
+		v.Connected = false
+	}
 }
 func (t *TestDB) StoreContext(c *gripdata.Context) error {
 	t.Lock()
 	defer t.Unlock()
 	id := base64.StdEncoding.EncodeToString(c.Dig)
 	t.Contexts[id] = c
+	t.addDig(c)
 	return nil
 }
 func (t *TestDB) GetContext(id []byte) *gripdata.Context {
@@ -317,6 +418,7 @@ func (t *TestDB) StoreContextRequest(c *gripdata.ContextRequest) error {
 	defer t.Unlock()
 	sid := base64.StdEncoding.EncodeToString(c.Dig)
 	t.ContextRequests[sid] = append(t.ContextRequests[sid], *c)
+	t.addDig(c)
 	return nil
 }
 func (t *TestDB) GetContextRequest(cid []byte, tgtid []byte) *gripdata.ContextRequest {
@@ -342,6 +444,7 @@ func (t *TestDB) StoreContextResponse(c *gripdata.ContextResponse) error {
 		t.ContextResponses[cid] = m
 	}
 	m[tid] = c
+	t.addDig(c)
 	return nil
 }
 
@@ -398,6 +501,18 @@ func (t *TestDB) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
 	t.Lock()
 	defer t.Unlock()
 	t.VeryBadContextFiles = append(t.VeryBadContextFiles, *c)
+	return nil
+}
+
+func (t *TestDB) CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error {
+	t.Lock()
+	defer t.Unlock()
+	a = t.Accounts[a.AccountID]
+	if a.DiskSpaceUsed+fsize > a.MaxDiskSpace {
+		return errors.New("would exceed max storage")
+	}
+	a.DiskSpaceUsed = a.DiskSpaceUsed + fsize
+	t.Accounts[a.AccountID] = a
 	return nil
 }
 

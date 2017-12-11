@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"log"
+	"os"
 
 	"github.com/wyathan/grip/gripdata"
 )
@@ -147,6 +148,11 @@ func IncomingContextResponse(c *gripdata.ContextResponse, db NodeNetAccountConte
 	if err != nil {
 		return err
 	}
+	//Forward to nodes participating in the context
+	err = SendToAllContextRequests(c, c.ContextDig, db)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -164,7 +170,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 		return nil
 	}
 	ctx := db.GetContext(c.Context)
-	if !IsIfValidContextSource(pr.ID, ctx, nil, db) {
+	if !IsIfValidContextSource(c.NodeID, ctx, nil, db) {
 		db.StoreVeryBadContextFile(c)
 		log.Printf("Incoming ContextFile without permission: %s", c.Dig)
 		return errors.New("Not valid source node ")
@@ -177,6 +183,23 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	if !a.AllowContextSource && a.Enabled {
 		return errors.New("Account does not allow context source")
 	}
-	//TODO:  You are here
+	//You are here
+	//Check file size
+	st, err2 := os.Stat(c.Path)
+	if err2 != nil {
+		return err2
+	}
+	//Check max file storage
+	err = db.CheckUpdateStorageUsed(a, uint64(st.Size()))
+	if err != nil {
+		return err
+	}
+	//Store new context file
+	db.StoreContextFile(c)
+	//Forward to other participants
+	err = SendToAllContextParticipants(c, c.Context, db)
+	if err != nil {
+		return err
+	}
 	return nil
 }

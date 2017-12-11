@@ -2,10 +2,14 @@ package grip
 
 import (
 	"encoding/base64"
+	"errors"
 	"log"
+	"math/rand"
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/orcaman/concurrent-map"
 
 	"github.com/wyathan/grip/gripdata"
 )
@@ -27,9 +31,17 @@ const MAXCONNECTIONS int = 1000
 //MAXCONNECTIONATTEMPTS number of connections to attempt at once
 const MAXCONNECTIONATTEMPTS int = 20
 
-//SLEEPONNOCONNECTIONS if we run out of connections how long do
-//we wait until we test it again
-const SLEEPONNOCONNECTIONS time.Duration = 5 * time.Second
+//TRYCONNECTAGAINAFTERFAIL how long to wait until we try to connect
+//again after we've failed
+const TRYCONNECTAGAINAFTERFAIL time.Duration = 1 * time.Second
+
+//WAITUNTILCONNECTAGAIN give connections this amount of time to
+//become established and upated in the database before we try
+//to connect again.  It should take less time than this for both
+//ends of a connection to close after one side closes, otherwise
+//existing connections that haven't yet completely closed will
+//keep new connections from being made.
+const WAITUNTILCONNECTAGAIN time.Duration = TRYCONNECTAGAINAFTERFAIL
 
 //Connection handles sending and reading data
 //on a connection
@@ -53,15 +65,39 @@ type SocketController struct {
 	Connections map[string]*ConnectionController
 	S           Socket
 	Done        bool
-	DB          NodeNetAccountdb
+	DB          NodeNetAccountContextdb
+	LastLoop    uint64
 }
 
-func NewSocketController(sock Socket, db NodeNetAccountdb) *SocketController {
+//NewSocketController builds a new SocketController to handle
+//incoming connections
+func NewSocketController(sock Socket, db NodeNetAccountContextdb) *SocketController {
 	var s SocketController
 	s.S = sock
 	s.DB = db
 	s.Connections = make(map[string]*ConnectionController)
 	return &s
+}
+
+func (s *SocketController) checkConnections() {
+	s.Lock()
+	defer s.Unlock()
+	mid, _ := s.DB.GetPrivateNodeData()
+	for k, con := range s.Connections {
+		if con.Done {
+			log.Printf("ERROR: Connection done, but still connected me: %s, from: %s",
+				base64.StdEncoding.EncodeToString(mid.ID), k)
+		}
+	}
+	conlst := s.DB.GetAllConnected()
+	for _, cn := range conlst {
+		st := base64.StdEncoding.EncodeToString(cn.ID)
+		con := s.Connections[st]
+		if con == nil {
+			log.Printf("ERROR: Node Ephemera says connected, but not! me %s, from %s",
+				base64.StdEncoding.EncodeToString(mid.ID), st)
+		}
+	}
 }
 
 func (s *SocketController) addConnection(c *ConnectionController) bool {
@@ -75,11 +111,15 @@ func (s *SocketController) addConnection(c *ConnectionController) bool {
 	ck := base64.StdEncoding.EncodeToString(c.C.GetNodeID())
 	cc := s.Connections[ck]
 	if cc != nil {
+		//NOTE00 This is important otherwise the existing connection
+		//may be removed from the Connections map when this
+		//one is closed
 		c.SocketCtrl = nil
 		c.Close()
 		return false
 	}
 	c.SocketCtrl = s
+	log.Printf("ADDCON!")
 	s.Connections[ck] = c
 	return true
 }
@@ -88,6 +128,7 @@ func (s *SocketController) removeConnection(id []byte) {
 	s.Lock()
 	defer s.Unlock()
 	ck := base64.StdEncoding.EncodeToString(id)
+	log.Printf("DELETE")
 	delete(s.Connections, ck)
 }
 
@@ -144,14 +185,7 @@ func (s *SocketController) closeAllConnections() {
 func (s *SocketController) Start() {
 	//We're just starting.  We can't be
 	//connected to any node
-	cl := s.DB.GetAllConnected()
-	for _, c := range cl {
-		c.Connected = false
-		err := s.DB.StoreNodeEphemera(&c)
-		if err != nil {
-			log.Fatal("Failed to update database")
-		}
-	}
+	s.DB.ClearAllConnected()
 	go s.listenRoutine()
 	go s.connectRoutine()
 }
@@ -167,57 +201,122 @@ func (s *SocketController) listenRoutine() {
 			ctrl.DB = s.DB
 			ctrl.Incoming = true
 			ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
-			ctrl.Pending = make(map[string]bool)
+			ctrl.Pending = cmap.New()
+			ctrl.ConID = rand.Uint64()
 			s.addConnection(&ctrl)
 			go ctrl.ConnectionReadRoutine()
 			go ctrl.ConnectionWriteRoutine()
 		}
 		con, err = s.S.Accept()
+		s.LastLoop = uint64(time.Now().UnixNano())
 	}
 }
 
+func (s *SocketController) connectToNodeEphemera(c *gripdata.NodeEphemera) {
+	n := s.DB.GetNode(c.ID)
+	con, err := s.S.ConnectTo(n)
+	if con != nil && err == nil {
+		var ctrl ConnectionController
+		ctrl.C = con
+		ctrl.DB = s.DB
+		ctrl.Incoming = false
+		ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+		ctrl.Pending = cmap.New()
+		ctrl.ConID = rand.Uint64()
+		s.addConnection(&ctrl)
+		go ctrl.ConnectionReadRoutine()
+		go ctrl.ConnectionWriteRoutine()
+	} else {
+		log.Print("Connection error\n")
+		nt := uint64(time.Now().UnixNano())
+		s.DB.SetNodeEphemeraNextConnection(c.ID, nt, nt+uint64(TRYCONNECTAGAINAFTERFAIL.Nanoseconds()))
+	}
+}
+
+func (s *SocketController) canAttempt(attempted *map[string]uint64, id []byte, nowtime uint64) bool {
+	sid := base64.StdEncoding.EncodeToString(id)
+	oldenough := nowtime - uint64(WAITUNTILCONNECTAGAIN)
+	if (*attempted)[sid] < oldenough {
+		(*attempted)[sid] = nowtime
+		return true
+	}
+	return false
+}
+
 func (s *SocketController) connectRoutine() {
-	log.Printf("Starting connectRoutine")
+	attempted := make(map[string]uint64)
 	for !s.Done {
-		//Check max connections
+		nt := uint64(time.Now().UnixNano())
 		nm := s.numberConnections()
 		if nm <= MAXCONNECTIONS {
-			cl := s.DB.GetConnectableNodesWithSendData(MAXCONNECTIONATTEMPTS, uint64(time.Now().UnixNano()))
+			cl := s.DB.GetConnectableNodesWithSendData(MAXCONNECTIONATTEMPTS, nt)
 			for _, c := range cl {
-				n := s.DB.GetNode(c.ID)
-				con, err := s.S.ConnectTo(n)
-				if con != nil && err == nil {
-					var ctrl ConnectionController
-					ctrl.C = con
-					ctrl.DB = s.DB
-					ctrl.Incoming = false
-					ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
-					ctrl.Pending = make(map[string]bool)
-					s.addConnection(&ctrl)
-					go ctrl.ConnectionReadRoutine()
-					go ctrl.ConnectionWriteRoutine()
-				} else {
-					nt := uint64(time.Now().UnixNano())
-					c.LastConnAttempt = nt
-					c.NextAttempt = nt + ((nt - c.LastConnection) / 2)
-					s.DB.StoreNodeEphemera(&c)
+				if s.canAttempt(&attempted, c.ID, nt) {
+					s.connectToNodeEphemera(&c)
 				}
 			}
 		}
-		time.Sleep(1 * time.Second)
+		nm = s.numberConnections()
+		if nm <= MAXCONNECTIONS {
+			cl := s.DB.GetConnectableNodesWithShareNodeKey(MAXCONNECTIONATTEMPTS, nt)
+			for _, c := range cl {
+				if s.canAttempt(&attempted, c.ID, nt) {
+					s.connectToNodeEphemera(&c)
+				}
+			}
+		}
+		nm = s.numberConnections()
+		if nm <= MAXCONNECTIONS {
+			cl := s.DB.GetConnectableUseShareKeyNodes(MAXCONNECTIONATTEMPTS, nt)
+			for _, c := range cl {
+				if s.canAttempt(&attempted, c.ID, nt) {
+					s.connectToNodeEphemera(&c)
+				}
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+		nt = uint64(time.Now().UnixNano())
+		nm = s.numberConnections()
+		if nm <= MAXCONNECTIONS {
+			cl := s.DB.GetConnectableAny(MAXCONNECTIONATTEMPTS, nt)
+			//Select one at random
+			ln := len(cl)
+			if ln > 0 {
+				idx := rand.Intn(len(cl))
+				if s.canAttempt(&attempted, cl[idx].ID, nt) {
+					log.Printf("Attempt random connection")
+					s.connectToNodeEphemera(&cl[idx])
+				}
+			}
+		}
+		s.checkConnections()
 	}
 }
 
 //ConnectionController is a handle for connections
 type ConnectionController struct {
 	sync.Mutex
-	C          Connection
-	SendChan   chan interface{}
-	Done       bool
-	Incoming   bool
-	DB         NodeNetAccountdb
-	SocketCtrl *SocketController
-	Pending    map[string]bool
+	C             Connection
+	SendChan      chan interface{}
+	Done          bool
+	Incoming      bool
+	DB            NodeNetAccountContextdb
+	SocketCtrl    *SocketController
+	Pending       cmap.ConcurrentMap
+	ConID         uint64
+	LastReadLoop  uint64
+	LastWriteLoop uint64
+}
+
+func (s *SocketController) ShowLastLoops(m map[string]int) {
+	s.Lock()
+	defer s.Unlock()
+	mid, _ := s.DB.GetPrivateNodeData()
+	msid := base64.StdEncoding.EncodeToString(mid.ID)
+	log.Printf("Node %d Last listen loop %d", m[msid], s.LastLoop)
+	for k, v := range s.Connections {
+		log.Printf("    To Node %d  last write %d, last read %d", m[k], v.LastWriteLoop, v.LastReadLoop)
+	}
 }
 
 //CheckDig check if a node has a digest you want to send it
@@ -239,19 +338,47 @@ type SendDig struct {
 
 //RejectDig indicates this digest was rejected by the receving node
 type RejectDig struct {
+	Dig     []byte
+	Message string
+}
+
+//AckDig indicates the receiving node got the data
+type AckDig struct {
 	Dig []byte
 }
 
 //Close a connection
 func (ctrl *ConnectionController) Close() {
+	//Empty SendChan in case sendToChan is blocking on
+	//a full channel keeping us from getting the ctrl lock
+	go func() {
+		for nil != <-ctrl.SendChan {
+		}
+	}()
+	go func() {
+		_, err := ctrl.C.Read()
+		for err == nil {
+			_, err = ctrl.C.Read()
+		}
+	}()
 	ctrl.Lock()
-	defer ctrl.Unlock()
 	if !ctrl.Done {
 		ctrl.Done = true
 		close(ctrl.SendChan)
 		if ctrl.SocketCtrl != nil {
 			ctrl.SocketCtrl.removeConnection(ctrl.C.GetNodeID())
 		}
+	}
+	ctrl.Unlock()
+}
+
+//This is nasty, should just find way of only closing SendChan once done sending
+//for good
+func (ctrl *ConnectionController) sendToChan(d interface{}) {
+	ctrl.Lock()
+	defer ctrl.Unlock()
+	if !ctrl.Done {
+		ctrl.SendChan <- d
 	}
 }
 
@@ -268,12 +395,23 @@ func (ctrl *ConnectionController) sendFromDatabase() (int, error) {
 
 func (ctrl *ConnectionController) sendSendDataList(sl []gripdata.SendData) error {
 	for _, v := range sl {
+		if ctrl.Done {
+			return errors.New("Connection closed")
+		}
 		ds := base64.StdEncoding.EncodeToString(v.Dig)
-		if !ctrl.Pending[ds] {
+		fnd := false
+		val, ok := ctrl.Pending.Get(ds)
+		if ok {
+			fnd = val.(bool)
+		}
+		if !fnd {
 			var cd CheckDig
 			cd.Dig = v.Dig
-			ctrl.C.Send(cd)
-			ctrl.Pending[ds] = true
+			err := ctrl.C.Send(cd)
+			if err != nil {
+				return err
+			}
+			ctrl.Pending.Set(ds, true)
 		}
 	}
 	return nil
@@ -286,22 +424,20 @@ func (ctrl *ConnectionController) sendSendData(d []byte) error {
 		if err != nil {
 			return err
 		}
-		err = ctrl.deleteSendData(d)
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
 func (ctrl *ConnectionController) deleteSendData(d []byte) error {
-	defer delete(ctrl.Pending, base64.StdEncoding.EncodeToString(d))
+	defer ctrl.Pending.Remove(base64.StdEncoding.EncodeToString(d))
+	log.Printf("Deleting senddata %s\n", base64.StdEncoding.EncodeToString(d))
 	return ctrl.DB.DeleteSendData(d, ctrl.C.GetNodeID())
 }
 
-func (ctrl *ConnectionController) sendDataRejected(d []byte) error {
+func (ctrl *ConnectionController) sendDataRejected(d []byte, msg string) error {
 	var r RejectDig
 	r.Dig = d
+	r.Message = msg
 	return ctrl.C.Send(r)
 }
 
@@ -319,14 +455,23 @@ func (ctrl *ConnectionController) storeDataRejected(d []byte) error {
 
 //ConnectionWriteRoutine go routine to write to connections
 func (ctrl *ConnectionController) ConnectionWriteRoutine() {
-	defer ctrl.C.Close() //Only close connection here
-
+	defer func() {
+		ctrl.setConnectionClosed()
+		ctrl.C.Close() //Only close connection here
+	}()
 	if !ctrl.Done {
 		ctrl.setConnected(ctrl.Incoming)
 		myn, _ := ctrl.DB.GetPrivateNodeData()
-		ctrl.C.Send(myn)
+		err := ctrl.C.Send(myn)
+		if err != nil {
+			log.Print("Failed to send my node data for connection init")
+			ctrl.Close()
+		}
 		c, err := ctrl.sendFromDatabase()
-		for err == nil && !ctrl.Done {
+		if err != nil {
+			ctrl.Close()
+		}
+		for !ctrl.Done {
 			timeout := make(chan bool, 1)
 			go func(ct int) {
 				if ct == 0 {
@@ -360,19 +505,30 @@ func (ctrl *ConnectionController) ConnectionWriteRoutine() {
 			case <-timeout:
 				c, err = ctrl.sendFromDatabase()
 			}
+			if err != nil {
+				ctrl.Close()
+			}
+			ctrl.LastWriteLoop = uint64(time.Now().UnixNano())
 		}
-		if err != nil {
-			log.Printf("Connection error: %s\n", err)
-		}
-		ctrl.setConnectionClosed()
+	}
+}
+
+func (ctrl *ConnectionController) processSendError(fname string, dig []byte, err error) {
+	if err == nil {
+		log.Printf("%s data received", fname)
+		ctrl.sendToChan(AckDig{Dig: dig})
+	} else {
+		log.Printf("%s data rejected: %s", fname, err)
+		ctrl.sendDataRejected(dig, err.Error())
 	}
 }
 
 //ConnectionReadRoutine go routine to read from connections
 func (ctrl *ConnectionController) ConnectionReadRoutine() {
 	defer ctrl.Close()
+	log.Printf("SRR %t", ctrl.Done)
 	d, err := ctrl.C.Read()
-	for err == nil {
+	for err == nil && !ctrl.Done {
 		if d != nil {
 			log.Printf("Incoming type: %s\n", reflect.TypeOf(d).String())
 			switch v := d.(type) {
@@ -383,78 +539,72 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 				var rsp RespDig
 				rsp.Dig = v.Dig
 				rsp.HaveIt = (t != nil)
-				ctrl.SendChan <- rsp
+				ctrl.sendToChan(rsp)
 			case RespDig:
 				var sd SendDig
 				sd.Dig = v.Dig
 				sd.HaveIt = v.HaveIt
-				ctrl.SendChan <- sd
+				ctrl.sendToChan(sd)
 			case RejectDig:
 				err = ctrl.storeDataRejected(v.Dig)
 				if err != nil {
-					log.Printf("Failed to save rejected data record! %s\n", err)
+					log.Printf("Failed to save rejected data record! %s", err)
+				}
+			case AckDig:
+				err = ctrl.deleteSendData(v.Dig)
+				if err != nil {
+					log.Printf("Failed to delete SendData! %s", err)
 				}
 			case *gripdata.Node:
 				err = IncomingNode(v, ctrl.DB)
-				if err == nil {
-					log.Println("Node data received")
-				} else {
-					log.Printf("Node data error: %s\n", err)
-					ctrl.sendDataRejected(v.Dig)
-				}
+				ctrl.processSendError("Node", v.Dig, err)
 			case *gripdata.AssociateNodeAccountKey:
 				err = IncomingNodeAccountKey(v, ctrl.DB)
-				if err == nil {
-					log.Println("AssociateNodeAccountKey data received")
-				} else {
-					log.Printf("AssociateNodeAccountKey data error: %s\n", err)
-					ctrl.sendDataRejected(v.Dig)
-				}
+				ctrl.processSendError("AssociateNodeAccountKey", v.Dig, err)
 			case *gripdata.UseShareNodeKey:
 				err = IncomingUseShareNodeKey(v, ctrl.DB)
-				if err == nil {
-					log.Println("UseShareNodeKey data received")
-				} else {
-					log.Printf("UseShareNodeKey data error: %s\n", err)
-					ctrl.sendDataRejected(v.Dig)
-				}
+				ctrl.processSendError("UseShareNodeKey", v.Dig, err)
 			case *gripdata.ShareNodeInfo:
 				err = IncomingShareNode(v, ctrl.DB)
-				if err == nil {
-					log.Printf("ShareNodeInfo data received\n")
-				} else {
-					log.Printf("ShareNodeInfo data error, err? %s\n", err)
-					ctrl.sendDataRejected(v.Dig)
-				}
+				ctrl.processSendError("ShareNodeInfo", v.Dig, err)
+			case *gripdata.Context:
+				err = IncomingContext(v, ctrl.DB)
+				ctrl.processSendError("Context", v.Dig, err)
+			case *gripdata.ContextRequest:
+				err = IncomingContextRequest(v, ctrl.DB)
+				ctrl.processSendError("ContextRequest", v.Dig, err)
+			case *gripdata.ContextResponse:
+				err = IncomingContextResponse(v, ctrl.DB)
+				ctrl.processSendError("ContextResponse", v.Dig, err)
+			case *gripdata.ContextFile:
+				err = IncomingContextFile(v, ctrl.DB)
+				ctrl.processSendError("ContextFile", v.Dig, err)
 			}
 		}
 		d, err = ctrl.C.Read()
+		ctrl.LastReadLoop = uint64(time.Now().UnixNano())
 	}
 	if err != nil {
 		log.Printf("Connection error: %s\n", err)
 	}
 }
 
-func (ctrl *ConnectionController) setConnected(incomming bool) error {
-	nid := ctrl.DB.GetNodeEphemera(ctrl.C.GetNodeID())
-	if nid == nil {
-		var n gripdata.NodeEphemera
-		n.ID = ctrl.C.GetNodeID()
-		nid = &n
+func (ctrl *ConnectionController) setConnected(incomming bool) {
+	nt := uint64(time.Now().UnixNano())
+	myid, _ := ctrl.DB.GetPrivateNodeData()
+	msid := base64.StdEncoding.EncodeToString(myid.ID)
+	fsid := base64.StdEncoding.EncodeToString(ctrl.C.GetNodeID())
+	log.Printf("New Connection %d, me: %s from: %s", ctrl.ConID, msid, fsid)
+	err := ctrl.DB.SetNodeEphemeraConnected(incomming, ctrl.C.GetNodeID(), nt)
+	if err != nil {
+		log.Printf("Error setting connected: %s", err)
 	}
-	nid.Connected = true
-	if incomming {
-		nid.LastConnReceived = uint64(time.Now().UnixNano())
-	} else {
-		nid.LastConnection = uint64(time.Now().UnixNano())
-	}
-	return ctrl.DB.StoreNodeEphemera(nid)
 }
 
 func (ctrl *ConnectionController) setConnectionClosed() {
-	nid := ctrl.DB.GetNodeEphemera(ctrl.C.GetNodeID())
-	if nid != nil {
-		nid.Connected = false
-		ctrl.DB.StoreNodeEphemera(nid)
+	log.Printf("Connection closed: %d", ctrl.ConID)
+	err := ctrl.DB.SetNodeEphemeraClosed(ctrl.C.GetNodeID())
+	if err != nil {
+		log.Printf("Error setting connection closed: %s", err)
 	}
 }

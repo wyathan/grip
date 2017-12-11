@@ -4,12 +4,25 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
+	"math/rand"
 	"reflect"
 	"sync"
 
 	"github.com/wyathan/grip"
 	"github.com/wyathan/grip/gripdata"
 )
+
+//NETWORKFAILPERCENT is the likelyhood a network transaction will fail
+const NETWORKFAILPERCENT = 10
+
+func (t *TestConnection) isFail() bool {
+	v := rand.Intn(100)
+	fl := v < NETWORKFAILPERCENT
+	if fl {
+		log.Printf("RANDOM FAILURE FROM %d to %d value: %d\n", t.LclIndex, t.RmtIndex, v)
+	}
+	return v < NETWORKFAILPERCENT
+}
 
 func testTestSocketImplements() {
 	var t TestSocket
@@ -92,6 +105,12 @@ func (s *TestSocket) Close() {
 }
 
 func (s *TestSocket) Accept() (grip.Connection, error) {
+	//The accept loop exits if Accept ever returns an error.
+	//FIXME: Find out what conditions network accept fails.  Retry or close program as needed.
+	//FIXME: Prefer to retry or reopen the socket.
+	//if isFail() {
+	//	return nil, errors.New("Random connection failure")
+	//}
 	r, ok := <-s.SC
 	if !ok || r == nil {
 		return nil, errors.New("Socket closed")
@@ -111,6 +130,11 @@ func (s *TestSocket) ConnectTo(n *gripdata.Node) (grip.Connection, error) {
 	t.ID = n.ID
 	t.LclIndex = s.Index
 	t.RmtIndex = ts.Index
+	fv := rand.Intn(100)
+	if fv < NETWORKFAILPERCENT {
+		log.Printf("RANDOM FAILURE FROM %d to %d value: %d", t.LclIndex, t.RmtIndex, fv)
+		return nil, errors.New("Random connection failure")
+	}
 
 	tr.ReadC = t.WriteC
 	tr.WriteC = t.ReadC
@@ -135,6 +159,9 @@ type TestConnection struct {
 }
 
 func (c *TestConnection) Read() (interface{}, error) {
+	if c.isFail() {
+		return nil, errors.New("Random connection failure")
+	}
 	r, ok := <-c.ReadC
 	if !ok || r == nil {
 		return nil, errors.New("Connection closed")
@@ -144,6 +171,9 @@ func (c *TestConnection) Read() (interface{}, error) {
 }
 
 func (c *TestConnection) Send(d interface{}) error {
+	if c.isFail() {
+		return errors.New("Random connection failure")
+	}
 	if c.Closed {
 		return errors.New("Connection closed")
 	}
@@ -165,6 +195,15 @@ func (c *TestConnection) Close() {
 	c.Closed = true
 	close(c.WriteC)
 	log.Printf("CLOSE: FROM %d TO: %d\n", c.RmtIndex, c.LclIndex)
+	/*
+	*  Must drain the read channel, or it could block the ConnectionWriteRoutine
+	*  loop.  This kept the nodes from establishing new connections to send/receive
+	*  new data.
+	 */
+	go func() {
+		for ok := true; ok; _, ok = <-c.ReadC {
+		}
+	}()
 }
 
 func (c *TestConnection) GetNodeID() []byte {

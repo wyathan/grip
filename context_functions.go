@@ -148,9 +148,20 @@ func NewContextResponse(c *gripdata.ContextResponse, db NodeNetConextdb) error {
 		return errors.New("Failed to create send request")
 	}
 	//Send to all with requests
-	clr := db.GetContextRequests(c.ContextDig)
+	err = SendToAllContextRequests(c, c.ContextDig, db)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//SendToAllContextRequests sends data to all nodes that have a valid request for
+//a context
+func SendToAllContextRequests(c gripcrypto.SignInf, cid []byte, db NodeNetConextdb) error {
+	//Send to all with requests
+	clr := db.GetContextRequests(cid)
 	for _, ct := range clr {
-		err = CreateNewSend(c, ct.TargetNodeID, db)
+		err := CreateNewSend(c, ct.TargetNodeID, db)
 		if err != nil {
 			return errors.New("Failed to create send request")
 		}
