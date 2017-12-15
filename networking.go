@@ -365,12 +365,6 @@ func (ctrl *ConnectionController) Close() {
 		for nil != <-ctrl.SendChan {
 		}
 	}()
-	go func() {
-		_, err := ctrl.C.Read()
-		for err == nil {
-			_, err = ctrl.C.Read()
-		}
-	}()
 	ctrl.Lock()
 	if !ctrl.Done {
 		ctrl.Done = true

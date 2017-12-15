@@ -44,12 +44,12 @@ func WaitUntilZero(db *TestDB, nid int) bool {
 	lastsize := 0
 	numtosend := NumToSendTo(db, nid)
 	failloop := 0
-	for maxloops := 6; numtosend > 0 && maxloops > 0; maxloops-- {
+	for maxloops := 30; numtosend > 0 && maxloops > 0; maxloops-- {
 		time.Sleep(30 * time.Second)
 		numtosend = NumToSendTo(db, nid)
 		if lastsize > 0 && numtosend == lastsize {
 			failloop++
-			if failloop > 4 {
+			if failloop > 25 {
 				log.Printf("has not sent any in the last 30 seconds")
 				return false
 			}
@@ -90,7 +90,7 @@ func TestNodeShare(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	seedv := time.Now().UnixNano() //int64(1512875909907857300)
+	seedv := time.Now().UnixNano()
 	log.Printf("SEED VALUE: %d", seedv)
 	rand.Seed(seedv)
 	var nodes []*gripdata.Node
