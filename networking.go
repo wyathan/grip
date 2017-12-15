@@ -23,7 +23,7 @@ const MAXSEND int = 10
 const SLEEPONNOSEND time.Duration = 1 * time.Second
 
 //BUFFERSIZE is the send channel size
-const BUFFERSIZE int = 2
+const BUFFERSIZE int = 20
 
 //MAXCONNECTIONS is the maximum number of connections we allow
 const MAXCONNECTIONS int = 1000
@@ -196,16 +196,21 @@ func (s *SocketController) listenRoutine() {
 		if con.GetNodeID() == nil {
 			log.Printf("This is bad.  Connections should only return with valid ID")
 		} else {
-			var ctrl ConnectionController
-			ctrl.C = con
-			ctrl.DB = s.DB
-			ctrl.Incoming = true
-			ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
-			ctrl.Pending = cmap.New()
-			ctrl.ConID = rand.Uint64()
-			s.addConnection(&ctrl)
-			go ctrl.ConnectionReadRoutine()
-			go ctrl.ConnectionWriteRoutine()
+			if s.DB.CanNodeEphemeraGoPending(con.GetNodeID()) {
+				var ctrl ConnectionController
+				ctrl.C = con
+				ctrl.DB = s.DB
+				ctrl.Incoming = true
+				ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+				ctrl.Pending = cmap.New()
+				ctrl.ConID = rand.Uint64()
+				s.addConnection(&ctrl)
+				go ctrl.ConnectionReadRoutine()
+				go ctrl.ConnectionWriteRoutine()
+			} else {
+				con.Close()
+				s.DB.SetNodeEphemeraClosed(con.GetNodeID())
+			}
 		}
 		con, err = s.S.Accept()
 		s.LastLoop = uint64(time.Now().UnixNano())
@@ -213,23 +218,28 @@ func (s *SocketController) listenRoutine() {
 }
 
 func (s *SocketController) connectToNodeEphemera(c *gripdata.NodeEphemera) {
-	n := s.DB.GetNode(c.ID)
-	con, err := s.S.ConnectTo(n)
-	if con != nil && err == nil {
-		var ctrl ConnectionController
-		ctrl.C = con
-		ctrl.DB = s.DB
-		ctrl.Incoming = false
-		ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
-		ctrl.Pending = cmap.New()
-		ctrl.ConID = rand.Uint64()
-		s.addConnection(&ctrl)
-		go ctrl.ConnectionReadRoutine()
-		go ctrl.ConnectionWriteRoutine()
-	} else {
-		log.Print("Connection error\n")
-		nt := uint64(time.Now().UnixNano())
-		s.DB.SetNodeEphemeraNextConnection(c.ID, nt, nt+uint64(TRYCONNECTAGAINAFTERFAIL.Nanoseconds()))
+	if s.DB.CanNodeEphemeraGoPending(c.ID) {
+		n := s.DB.GetNode(c.ID)
+		con, err := s.S.ConnectTo(n)
+		if con != nil && err == nil {
+			var ctrl ConnectionController
+			ctrl.C = con
+			ctrl.DB = s.DB
+			ctrl.Incoming = false
+			ctrl.SendChan = make(chan interface{}, BUFFERSIZE)
+			ctrl.Pending = cmap.New()
+			ctrl.ConID = rand.Uint64()
+			s.addConnection(&ctrl)
+			go ctrl.ConnectionReadRoutine()
+			go ctrl.ConnectionWriteRoutine()
+		} else {
+			if con != nil {
+				con.Close()
+			}
+			log.Print("Connection error\n")
+			nt := uint64(time.Now().UnixNano())
+			s.DB.SetNodeEphemeraNextConnection(c.ID, nt, nt+uint64(TRYCONNECTAGAINAFTERFAIL.Nanoseconds()))
+		}
 	}
 }
 

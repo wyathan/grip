@@ -332,6 +332,23 @@ func (t *TestDB) GetAllConnected() []gripdata.NodeEphemera {
 	}
 	return r
 }
+func (t *TestDB) CanNodeEphemeraGoPending(id []byte) bool {
+	t.Lock()
+	defer t.Unlock()
+	sid := base64.StdEncoding.EncodeToString(id)
+	nid := t.NodeEphemera[sid]
+	if nid == nil {
+		var n gripdata.NodeEphemera
+		n.ID = id
+		nid = &n
+		t.NodeEphemera[sid] = nid
+	}
+	if !nid.Connected && !nid.ConnectionPending {
+		nid.ConnectionPending = true
+		return true
+	}
+	return false
+}
 func (t *TestDB) SetNodeEphemeraConnected(incomming bool, id []byte, curtime uint64) error {
 	t.Lock()
 	defer t.Unlock()
@@ -344,6 +361,7 @@ func (t *TestDB) SetNodeEphemeraConnected(incomming bool, id []byte, curtime uin
 		t.NodeEphemera[sid] = nid
 	}
 	nid.Connected = true
+	nid.ConnectionPending = false
 	if incomming {
 		nid.LastConnReceived = curtime
 	} else {
@@ -358,6 +376,7 @@ func (t *TestDB) SetNodeEphemeraClosed(id []byte) error {
 	nid := t.NodeEphemera[sid]
 	if nid != nil {
 		nid.Connected = false
+		nid.ConnectionPending = false
 	}
 	return nil
 }
@@ -383,6 +402,7 @@ func (t *TestDB) SetNodeEphemeraNextConnection(id []byte, last uint64, next uint
 	if ep != nil {
 		ep.LastConnAttempt = last
 		ep.NextAttempt = next
+		ep.ConnectionPending = false
 	}
 	return nil
 }

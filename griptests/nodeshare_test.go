@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
+	_ "net/http/pprof"
 	"testing"
 	"time"
 
@@ -84,6 +86,10 @@ func ShowAllConnections() {
 
 //TestNodeShare does that
 func TestNodeShare(t *testing.T) {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	seedv := time.Now().UnixNano() //int64(1512875909907857300)
 	log.Printf("SEED VALUE: %d", seedv)
 	rand.Seed(seedv)

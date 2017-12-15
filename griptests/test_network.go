@@ -20,8 +20,12 @@ func (t *TestConnection) isFail() bool {
 	fl := v < NETWORKFAILPERCENT
 	if fl {
 		log.Printf("RANDOM FAILURE FROM %d to %d value: %d\n", t.LclIndex, t.RmtIndex, v)
+		go func() {
+			for ok := true; ok; _, ok = <-t.ReadC {
+			}
+		}()
 	}
-	return v < NETWORKFAILPERCENT
+	return fl
 }
 
 func testTestSocketImplements() {
@@ -159,12 +163,12 @@ type TestConnection struct {
 }
 
 func (c *TestConnection) Read() (interface{}, error) {
-	if c.isFail() {
-		return nil, errors.New("Random connection failure")
-	}
 	r, ok := <-c.ReadC
 	if !ok || r == nil {
 		return nil, errors.New("Connection closed")
+	}
+	if c.isFail() {
+		return nil, errors.New("Random connection failure")
 	}
 	log.Printf("READ FROM: %d TO: %d %s\n", c.RmtIndex, c.LclIndex, reflect.TypeOf(r).String())
 	return r, nil

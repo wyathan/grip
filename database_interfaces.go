@@ -53,6 +53,7 @@ type Netdb interface {
 	CreateNodeEphemera(id []byte, connectable bool) error
 	SetNodeEphemeraNextConnection(id []byte, last uint64, next uint64) error
 	ClearAllConnected()
+	CanNodeEphemeraGoPending(id []byte) bool
 	SetNodeEphemeraConnected(incomming bool, id []byte, curtime uint64) error
 	SetNodeEphemeraClosed(id []byte) error
 }
