@@ -17,6 +17,11 @@ import (
 var NODEMAP map[string]int = make(map[string]int)
 var SOCKETS []*grip.SocketController
 
+func clearTestGlobals() {
+	NODEMAP = make(map[string]int)
+	SOCKETS = nil
+}
+
 func createNewNode(idx int, c bool, tn *TestNetwork) (*gripdata.MyNodePrivateData, *gripdata.Node, *TestDB) {
 	var n gripdata.Node
 	var pn gripdata.MyNodePrivateData
@@ -84,20 +89,11 @@ func ShowAllConnections() {
 	}
 }
 
-//TestNodeShare does that
-func TestNodeShare(t *testing.T) {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
-	seedv := time.Now().UnixNano()
-	log.Printf("SEED VALUE: %d", seedv)
-	rand.Seed(seedv)
-	var nodes []*gripdata.Node
-	var pnodes []*gripdata.MyNodePrivateData
-	var dbs []*TestDB
-	tn := InitTestNetwork()
-	for c := 0; c < 10; c++ {
+func createSomeNodes(num int) (tn *TestNetwork, nodes []*gripdata.Node, pnodes []*gripdata.MyNodePrivateData, dbs []*TestDB) {
+	clearTestGlobals()
+	tn = InitTestNetwork()
+	ct := uint64(time.Now().UnixNano()) + (10 * uint64(time.Minute))
+	for c := 0; c < num; c++ {
 		pr, n, db := createNewNode(c, c == 0, tn)
 		nodes = append(nodes, n)
 		dbs = append(dbs, db)
@@ -105,19 +101,21 @@ func TestNodeShare(t *testing.T) {
 	}
 	pnodes[0].AutoShareNodeInfo = false
 
-	for c := 1; c < 10; c++ {
+	for c := 1; c < num; c++ {
 		grip.IncomingNode(nodes[0], dbs[c])
 		var a gripdata.Account
-		var na gripdata.NodeAccount
+		var na gripdata.NodeAccountKey
 		a.AccountID = fmt.Sprintf("node%d", c)
 		a.Enabled = true
 		a.AllowNodeAcocuntKey = true
+		a.MaxNodes = 1
 		dbs[0].StoreAccount(&a)
 
 		na.AccountID = a.AccountID
-		na.Enabled = true
-		na.NodeID = nodes[c].ID
-		dbs[0].StoreNodeAccount(&na)
+		na.OneTime = true
+		na.Expiration = ct
+		na.Key = fmt.Sprintf("node%dkey", c)
+		dbs[0].StoreNodeAccountKey(&na)
 
 		pnodes[c].AutoCreateShareAccount = true
 		pnodes[c].AutoAccountAllowContextNode = true
@@ -127,7 +125,27 @@ func TestNodeShare(t *testing.T) {
 		pnodes[c].AutoAccountMaxNodes = 1000
 		pnodes[c].AutoAccountMaxDiskSpace = 1024 * 1024 * 1024
 		dbs[c].StoreMyPrivateNodeData(nodes[c], pnodes[c])
+
+		grip.AssociateNodeAccoutKey(na.Key, nodes[0].ID, dbs[c])
 	}
+	if !WaitUntilAllSent(dbs) {
+		log.Fatal("Failed to send assocate node key")
+	}
+	log.Printf("<<<<<<<<<<<<<<<<<<<<<<< %d nodes created <<<<<<<<<<<<<<<<<<<<<<<<<", num)
+	return tn, nodes, pnodes, dbs
+}
+
+//TestNodeShare does that
+func TestNodeShare(t *testing.T) {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	seedv := time.Now().UnixNano()
+	log.Printf("SEED VALUE: %d", seedv)
+	rand.Seed(seedv)
+
+	tn, nodes, _, dbs := createSomeNodes(10)
 
 	var shr gripdata.ShareNodeInfo
 	shr.Key = "abcd123"

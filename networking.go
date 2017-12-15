@@ -23,6 +23,12 @@ const MAXSEND int = 10
 const SLEEPONNOSEND time.Duration = 1 * time.Second
 
 //BUFFERSIZE is the send channel size
+//Note: The test network sometimes results in a deadlock where
+//the ReadRoutine will block because the SendChan is full.
+//The WriteRoutine won't clear SendChan because it's blocked
+//trying to add to the testnetwork Send channel.  It is full because
+//the other end of the connection's ReadRoutine is also blocked, etc.
+//Increasing this value mitigates this issue.
 const BUFFERSIZE int = 20
 
 //MAXCONNECTIONS is the maximum number of connections we allow
@@ -445,6 +451,18 @@ func (ctrl *ConnectionController) sendDataRejected(d []byte, msg string) error {
 	return ctrl.C.Send(r)
 }
 
+func (ctrl *ConnectionController) dataRejected(d []byte) error {
+	err := ctrl.storeDataRejected(d)
+	if err != nil {
+		return err
+	}
+	err = ctrl.deleteSendData(d)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (ctrl *ConnectionController) storeDataRejected(d []byte) error {
 	r := gripdata.RejectedSendData{}
 	r.Dig = d
@@ -550,9 +568,9 @@ func (ctrl *ConnectionController) ConnectionReadRoutine() {
 				sd.HaveIt = v.HaveIt
 				ctrl.sendToChan(sd)
 			case RejectDig:
-				err = ctrl.storeDataRejected(v.Dig)
+				err = ctrl.dataRejected(v.Dig)
 				if err != nil {
-					log.Printf("Failed to save rejected data record! %s", err)
+					log.Printf("Failed to process rejection! %s", err)
 				}
 			case AckDig:
 				err = ctrl.deleteSendData(v.Dig)

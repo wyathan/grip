@@ -16,7 +16,6 @@ type AssociateNodeAccountKey struct {
 	NodeID       []byte //Subject node to assocate with account
 	TargetNodeID []byte //The only node that should get this key where the account is
 	Key          string //The magic key
-	Expiration   uint64 //The time this key expires
 	Dig          []byte //This record's digest
 	Sig          []byte //Signed by NodeID private key
 }
@@ -24,7 +23,6 @@ type AssociateNodeAccountKey struct {
 //Digest AssociateNodeAccountKey
 func (a *AssociateNodeAccountKey) Digest() []byte {
 	h := sha512.New()
-	gripcrypto.HashUint64(h, a.Expiration)
 	gripcrypto.HashString(h, a.Key)
 	gripcrypto.HashBytes(h, a.NodeID)
 	gripcrypto.HashBytes(h, a.TargetNodeID)

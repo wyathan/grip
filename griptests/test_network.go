@@ -13,7 +13,7 @@ import (
 )
 
 //NETWORKFAILPERCENT is the likelyhood a network transaction will fail
-const NETWORKFAILPERCENT = 10
+const NETWORKFAILPERCENT = 0
 
 func (t *TestConnection) isFail() bool {
 	v := rand.Intn(100)

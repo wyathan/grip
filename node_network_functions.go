@@ -31,10 +31,6 @@ func IncomingNode(n *gripdata.Node, db NodeNetAccountdb) error {
 	if err != nil {
 		return err
 	}
-	createAutoAccount(pr, n.ID, db)
-	if !IsAccountEnabled(n, db) {
-		return errors.New("Account is not enabled")
-	}
 	//Find all ShareNodeInfo for this node
 	err = SendAllToShareWithMe(n, db)
 	if err != nil {

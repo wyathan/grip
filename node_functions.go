@@ -273,6 +273,24 @@ func CreateNewNode(pr *gripdata.MyNodePrivateData, n *gripdata.Node, db Nodedb) 
 	return nil
 }
 
+//AssociateNodeAccoutKey associates this node with an account
+//on another node
+func AssociateNodeAccoutKey(key string, tnid []byte, db NodeNetdb) error {
+	var nac gripdata.AssociateNodeAccountKey
+	nac.Key = key
+	nac.TargetNodeID = tnid
+	err := SignNodeSig(&nac, db)
+	if err != nil {
+		return err
+	}
+	err = db.StoreAssociateNodeAccountKey(&nac)
+	if err != nil {
+		return err
+	}
+	err = CreateNewSend(&nac, tnid, db)
+	return err
+}
+
 //SignNodeSig sign a new sign interface
 func SignNodeSig(s gripcrypto.SignInf, db Nodedb) error {
 	_, privdata := db.GetPrivateNodeData()

@@ -7,6 +7,8 @@ import (
 )
 
 func TestContexts(t *testing.T) {
+	clearTestGlobals()
+
 	var nodes []*gripdata.Node
 	var pnodes []*gripdata.MyNodePrivateData
 	var dbs []*TestDB

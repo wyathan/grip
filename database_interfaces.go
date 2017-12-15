@@ -27,6 +27,7 @@ type Nodedb interface {
 	ListShareNodeKey(s string) []gripdata.ShareNodeInfo   //List all ShareNodeInfo with key
 	StoreUseShareNodeKey(k *gripdata.UseShareNodeKey) error
 	ListUseShareNodeKey(k string) []gripdata.UseShareNodeKey //List all that have used key
+	StoreAssociateNodeAccountKey(n *gripdata.AssociateNodeAccountKey) error
 }
 
 //Netdb used for network db access

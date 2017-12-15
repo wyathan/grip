@@ -219,7 +219,12 @@ func (t *TestDB) ListUseShareNodeKey(k string) []gripdata.UseShareNodeKey {
 	defer t.Unlock()
 	return t.UseShareKeys[k]
 }
-
+func (t *TestDB) StoreAssociateNodeAccountKey(c *gripdata.AssociateNodeAccountKey) error {
+	t.Lock()
+	defer t.Unlock()
+	t.addDig(c)
+	return nil
+}
 func (t *TestDB) StoreSendData(s *gripdata.SendData) error {
 	t.Lock()
 	defer t.Unlock()

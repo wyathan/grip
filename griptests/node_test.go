@@ -47,6 +47,9 @@ func (a *TestNodeDb) StoreUseShareNodeKey(k *gripdata.UseShareNodeKey) error {
 func (a *TestNodeDb) ListUseShareNodeKey(k string) []gripdata.UseShareNodeKey {
 	return make([]gripdata.UseShareNodeKey, 0)
 }
+func (a *TestNodeDb) StoreAssociateNodeAccountKey(n *gripdata.AssociateNodeAccountKey) error {
+	return nil
+}
 
 func TestNodeCreateVerify(t *testing.T) {
 	var db TestNodeDb
