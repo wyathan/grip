@@ -14,7 +14,7 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
-var NODEMAP map[string]int = make(map[string]int)
+var NODEMAP = make(map[string]int)
 var SOCKETS []*grip.SocketController
 
 func clearTestGlobals() {
@@ -78,15 +78,6 @@ func WaitUntilAllSent(dbs []*TestDB) bool {
 		}
 	}
 	return true
-}
-
-func ShowAllConnections() {
-	log.Printf("================================= Current %d", time.Now().UnixNano())
-	for _, s := range SOCKETS {
-		log.Printf("===================================================")
-		s.ShowLastLoops(NODEMAP)
-		log.Printf("===================================================")
-	}
 }
 
 func createSomeNodes(num int) (tn *TestNetwork, nodes []*gripdata.Node, pnodes []*gripdata.MyNodePrivateData, dbs []*TestDB) {
@@ -368,8 +359,6 @@ func TestNodeShare(t *testing.T) {
 	if 2 != len(dbs[9].Nodes) {
 		t.Errorf("Missing nodes %d", len(dbs[9].Nodes))
 	}
-
-	ShowAllConnections()
 
 	tn.CloseAll()
 }
