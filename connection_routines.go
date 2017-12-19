@@ -46,24 +46,29 @@ func (ctrl *ConnectionController) sendData(r interface{}) (int, error) {
 	return sent, err
 }
 
+func (ctrl *ConnectionController) sendSelect(sent int) (int, error) {
+	var err error
+	timeout := ctrl.sendTimeout(sent)
+	select {
+	case r, ok := <-ctrl.SendChan:
+		if !ok || ctrl.Done {
+			//Do not call ctrl.Close() because
+			//its only purpose is to close ctlr.S
+			//so that this routine exits.
+			ctrl.Done = true
+		} else {
+			sent, err = ctrl.sendData(r)
+		}
+	case <-timeout:
+		sent, err = ctrl.sendFromDatabase()
+	}
+	return sent, err
+}
+
 func (ctrl *ConnectionController) sendLoop(sent int) {
 	for !ctrl.Done {
 		var err error
-		sent := 0
-		timeout := ctrl.sendTimeout(sent)
-		select {
-		case r, ok := <-ctrl.SendChan:
-			if !ok || ctrl.Done {
-				//Do not call ctrl.Close() because
-				//its only purpose is to close ctlr.S
-				//so that this routine exits.
-				ctrl.Done = true
-			} else {
-				sent, err = ctrl.sendData(r)
-			}
-		case <-timeout:
-			sent, err = ctrl.sendFromDatabase()
-		}
+		sent, err = ctrl.sendSelect(sent)
 		if err != nil {
 			ctrl.Close()
 		}
