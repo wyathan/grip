@@ -170,7 +170,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 		return nil
 	}
 	ctx := db.GetContext(c.Context)
-	if !IsIfValidContextSource(c.NodeID, ctx, nil, db) {
+	if !IsIfValidContextSource(c.NodeID, ctx, db) {
 		db.StoreVeryBadContextFile(c)
 		log.Printf("Incoming ContextFile without permission: %s", c.Dig)
 		return errors.New("Not valid source node ")

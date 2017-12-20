@@ -81,8 +81,8 @@ type NodeContextdb interface {
 	Contextdb
 }
 
-//NodeNetConextdb implements node, net, and context dbs
-type NodeNetConextdb interface {
+//NodeNetContextdb implements node, net, and context dbs
+type NodeNetContextdb interface {
 	Nodedb
 	Netdb
 	Contextdb
