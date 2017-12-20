@@ -84,20 +84,20 @@ func HashFile(h hash.Hash, f string) {
 	if err != nil {
 		log.Print(err)
 		h.Write([]byte{0})
-	} else {
-		defer file.Close()
-		for {
-			n, err := file.Read(buf)
-			if n > 0 {
-				h.Write(buf[:n])
-			}
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				log.Printf("read %d bytes: %v", n, err)
-				break
-			}
+		return
+	}
+	defer file.Close()
+	for {
+		n, err := file.Read(buf)
+		if n > 0 {
+			h.Write(buf[:n])
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("read %d bytes: %v", n, err)
+			break
 		}
 	}
 }
@@ -189,41 +189,45 @@ func Verify(g SignInf, pk []byte) bool {
 	return false
 }
 
+func ECDSASign(g SignInf, pk []byte, idx int) error {
+	//This is NOT on safecurve list.  FIXME!  Implement something better
+	var x, y, d *big.Int
+	var nx int
+	x, nx = ReadBigInt(pk[idx:])
+	idx += nx
+	y, nx = ReadBigInt(pk[idx:])
+	idx += nx
+	d, nx = ReadBigInt(pk[idx:])
+	cv := elliptic.P521()
+	p := ecdsa.PublicKey{Curve: cv, X: x, Y: y}
+	pv := ecdsa.PrivateKey{PublicKey: p, D: d}
+	r, s, err := ecdsa.Sign(rand.Reader, &pv, g.Digest())
+	if err != nil {
+		return err
+	}
+	rb, rblen := PrepareBigInt(r)
+	sb, sblen := PrepareBigInt(s)
+	if rblen < 0 || sblen < 0 {
+		return errors.New("Signature byte array less than 0")
+	}
+	totallen := MODELEN + rblen + sblen
+	ob := make([]byte, totallen)
+	idx = 0
+	binary.BigEndian.PutUint64(ob[0:MODELEN], ECDSAMODEP521)
+	idx += MODELEN
+	idx += WriteBigInt(ob[idx:idx+rblen], rb)
+	WriteBigInt(ob[idx:idx+sblen], sb)
+	g.SetSig(ob)
+	return nil
+}
+
 //Sign signs a sign interface
 func Sign(g SignInf, pk []byte) error {
 	idx := 0
 	ek := binary.BigEndian.Uint64(pk[idx:MODELEN])
 	idx += MODELEN
 	if ek == ECDSAMODEP521 {
-		//This is NOT on safecurve list.  FIXME!  Implement something better
-		var x, y, d *big.Int
-		var nx int
-		x, nx = ReadBigInt(pk[idx:])
-		idx += nx
-		y, nx = ReadBigInt(pk[idx:])
-		idx += nx
-		d, nx = ReadBigInt(pk[idx:])
-		cv := elliptic.P521()
-		p := ecdsa.PublicKey{Curve: cv, X: x, Y: y}
-		pv := ecdsa.PrivateKey{PublicKey: p, D: d}
-		r, s, err := ecdsa.Sign(rand.Reader, &pv, g.Digest())
-		if err != nil {
-			return err
-		}
-		rb, rblen := PrepareBigInt(r)
-		sb, sblen := PrepareBigInt(s)
-		if rblen < 0 || sblen < 0 {
-			return errors.New("Signature byte array less than 0")
-		}
-		totallen := MODELEN + rblen + sblen
-		ob := make([]byte, totallen)
-		idx := 0
-		binary.BigEndian.PutUint64(ob[0:MODELEN], ECDSAMODEP521)
-		idx += MODELEN
-		idx += WriteBigInt(ob[idx:idx+rblen], rb)
-		WriteBigInt(ob[idx:idx+sblen], sb)
-		g.SetSig(ob)
-		return nil
+		return ECDSASign(g, pk, idx)
 	}
 	return errors.New("Unknown key type")
 }
