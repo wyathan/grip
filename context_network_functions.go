@@ -148,6 +148,15 @@ func IncomingContextResponse(c *gripdata.ContextResponse, db NodeNetAccountConte
 	if err != nil {
 		return err
 	}
+	//Forward to context creator
+	ctx := db.GetContext(c.ContextDig)
+	if ctx == nil {
+		return errors.New("Context not found")
+	}
+	err = CreateNewSend(c, ctx.NodeID, db)
+	if err != nil {
+		return err
+	}
 	//Forward to nodes participating in the context
 	err = SendToAllContextRequests(c, c.ContextDig, db)
 	if err != nil {
@@ -167,7 +176,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	//Check the signature of the context file
 	err := VerifyNodeSig(c, db)
 	if err != nil {
-		return nil
+		return err
 	}
 	ctx := db.GetContext(c.Context)
 	if !IsIfValidContextSource(c.NodeID, ctx, db) {
@@ -180,7 +189,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	}
 	//Get the account for the creating node.
 	a := GetNodeAccount(c.NodeID, db)
-	if !a.AllowContextSource && a.Enabled {
+	if !((bytes.Equal(ctx.NodeID, c.NodeID) || a.AllowContextSource) && a.Enabled) {
 		return errors.New("Account does not allow context source")
 	}
 	//You are here

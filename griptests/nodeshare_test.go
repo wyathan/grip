@@ -91,6 +91,7 @@ func createSomeNodes(num int) (tn *TestNetwork, nodes []*gripdata.Node, pnodes [
 		pnodes = append(pnodes, pr)
 	}
 	pnodes[0].AutoShareNodeInfo = false
+	pnodes[0].AutoContextResponse = true
 
 	for c := 1; c < num; c++ {
 		grip.IncomingNode(nodes[0], dbs[c])
@@ -100,6 +101,8 @@ func createSomeNodes(num int) (tn *TestNetwork, nodes []*gripdata.Node, pnodes [
 		a.Enabled = true
 		a.AllowNodeAcocuntKey = true
 		a.MaxNodes = 1
+		a.MaxContexts = 1
+		a.MaxDiskSpace = 4096
 		dbs[0].StoreAccount(&a)
 
 		na.AccountID = a.AccountID

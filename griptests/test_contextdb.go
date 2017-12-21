@@ -44,7 +44,7 @@ func (t *TestDB) GetContextRequests(id []byte) []gripdata.ContextRequest {
 func (t *TestDB) StoreContextRequest(c *gripdata.ContextRequest) error {
 	t.Lock()
 	defer t.Unlock()
-	sid := base64.StdEncoding.EncodeToString(c.Dig)
+	sid := base64.StdEncoding.EncodeToString(c.ContextDig)
 	t.ContextRequests[sid] = append(t.ContextRequests[sid], *c)
 	t.addDig(c)
 	return nil

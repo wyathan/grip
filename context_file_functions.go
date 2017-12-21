@@ -102,12 +102,12 @@ func IsIfValidContextSource(nid []byte, ctx *gripdata.Context, db NodeNetContext
 	if ctx == nil {
 		return false
 	}
+	if bytes.Equal(ctx.NodeID, nid) {
+		return true
+	}
 	req := db.GetContextRequest(ctx.Dig, nid)
 	if req == nil {
 		return false
-	}
-	if bytes.Equal(ctx.NodeID, nid) {
-		return true
 	}
 	rq := filterContextRequest(req, db)
 	return rq != nil && rq.AllowContextSource

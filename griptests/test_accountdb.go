@@ -2,11 +2,10 @@ package griptests
 
 import (
 	"encoding/base64"
-	"errors"
+	"fmt"
 
 	"github.com/wyathan/grip/gripdata"
 )
-
 
 /*
 	StoreAccount(a *gripdata.Account) error
@@ -81,7 +80,7 @@ func (t *TestDB) CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error
 	defer t.Unlock()
 	a = t.Accounts[a.AccountID]
 	if a.DiskSpaceUsed+fsize > a.MaxDiskSpace {
-		return errors.New("would exceed max storage")
+		return fmt.Errorf("would exceed max storage %d >= %d", a.DiskSpaceUsed+fsize, a.MaxDiskSpace)
 	}
 	a.DiskSpaceUsed = a.DiskSpaceUsed + fsize
 	t.Accounts[a.AccountID] = a
