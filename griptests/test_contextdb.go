@@ -108,7 +108,7 @@ func (t *TestDB) StoreContextFile(c *gripdata.ContextFile) error {
 	defer t.Unlock()
 	cid := base64.StdEncoding.EncodeToString(c.Context)
 	dd := base64.StdEncoding.EncodeToString(c.DataDepDig)
-	t.ContextFilesByDepDig[dd] = &c
+	t.ContextFilesByDepDig[dd] = c
 	fl := t.ContextFiles[cid]
 	t.ContextFiles[cid] = append(fl, *c)
 	t.addDig(c)
