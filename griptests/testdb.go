@@ -14,24 +14,25 @@ import (
 //TestDB is that
 type TestDB struct {
 	sync.Mutex
-	LclNode             *gripdata.Node
-	LclPrvNodeData      *gripdata.MyNodePrivateData
-	Accounts            map[string]*gripdata.Account
-	AccountKeys         map[string]*gripdata.NodeAccountKey
-	NodeAccounts        map[string]*gripdata.NodeAccount
-	Nodes               map[string]*gripdata.Node
-	ShareNodes          map[string][]gripdata.ShareNodeInfo
-	ShareNodeKeys       map[string][]gripdata.ShareNodeInfo
-	UseShareKeys        map[string][]gripdata.UseShareNodeKey
-	SendData            map[string][]gripdata.SendData
-	DigData             map[string]interface{}
-	NodeEphemera        map[string]*gripdata.NodeEphemera
-	Contexts            map[string]*gripdata.Context
-	ContextRequests     map[string][]gripdata.ContextRequest
-	ContextResponses    map[string]map[string]*gripdata.ContextResponse
-	ContextFiles        map[string][]gripdata.ContextFile
-	RejectedData        map[string][]gripdata.RejectedSendData
-	VeryBadContextFiles []gripdata.ContextFile
+	LclNode              *gripdata.Node
+	LclPrvNodeData       *gripdata.MyNodePrivateData
+	Accounts             map[string]*gripdata.Account
+	AccountKeys          map[string]*gripdata.NodeAccountKey
+	NodeAccounts         map[string]*gripdata.NodeAccount
+	Nodes                map[string]*gripdata.Node
+	ShareNodes           map[string][]gripdata.ShareNodeInfo
+	ShareNodeKeys        map[string][]gripdata.ShareNodeInfo
+	UseShareKeys         map[string][]gripdata.UseShareNodeKey
+	SendData             map[string][]gripdata.SendData
+	DigData              map[string]interface{}
+	NodeEphemera         map[string]*gripdata.NodeEphemera
+	Contexts             map[string]*gripdata.Context
+	ContextRequests      map[string][]gripdata.ContextRequest
+	ContextResponses     map[string]map[string]*gripdata.ContextResponse
+	ContextFiles         map[string][]gripdata.ContextFile
+	ContextFilesByDepDig map[string]*gripdata.ContextFile
+	RejectedData         map[string][]gripdata.RejectedSendData
+	VeryBadContextFiles  []gripdata.ContextFile
 }
 
 func NewTestDB() *TestDB {
@@ -51,7 +52,7 @@ func NewTestDB() *TestDB {
 	t.ContextResponses = make(map[string]map[string]*gripdata.ContextResponse)
 	t.ContextFiles = make(map[string][]gripdata.ContextFile)
 	t.RejectedData = make(map[string][]gripdata.RejectedSendData)
-
+	t.ContextFilesByDepDig = make(map[string]*gripdata.ContextFile)
 	return &t
 }
 

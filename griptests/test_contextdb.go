@@ -89,7 +89,8 @@ func (t *TestDB) GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextR
 func (t *TestDB) GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile {
 	t.Lock()
 	defer t.Unlock()
-	return nil
+	dd := base64.StdEncoding.EncodeToString(d)
+	return t.ContextFilesByDepDig[dd]
 }
 func (t *TestDB) GetContextResponses(cid []byte) []gripdata.ContextResponse {
 	t.Lock()
@@ -106,6 +107,8 @@ func (t *TestDB) StoreContextFile(c *gripdata.ContextFile) error {
 	t.Lock()
 	defer t.Unlock()
 	cid := base64.StdEncoding.EncodeToString(c.Context)
+	dd := base64.StdEncoding.EncodeToString(c.DataDepDig)
+	t.ContextFilesByDepDig[dd] = &c
 	fl := t.ContextFiles[cid]
 	t.ContextFiles[cid] = append(fl, *c)
 	t.addDig(c)

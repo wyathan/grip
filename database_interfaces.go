@@ -73,6 +73,7 @@ type Contextdb interface {
 	//Never ever be able to access these as valid data!  Only for debug!
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile) error
+	GetAllThatDependOn(cid []byte, dig []byte) []gripdata.ContextFile
 }
 
 //NodeContextdb implements both Nodedb and Contextdb
