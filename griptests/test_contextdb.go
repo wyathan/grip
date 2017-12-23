@@ -120,3 +120,7 @@ func (t *TestDB) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
 	t.VeryBadContextFiles = append(t.VeryBadContextFiles, *c)
 	return nil
 }
+func (t *TestDB) GetAllThatDependOn(cid []byte, dig []byte) []gripdata.ContextFile {
+	var r []gripdata.ContextFile
+	return r
+}
