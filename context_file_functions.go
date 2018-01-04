@@ -10,8 +10,8 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
-func doesContextFielHaveLoop(head []byte, dep *gripdata.ContextFile, db NodeNetContextdb) bool {
-	for _, dr := range dep.DependsOn {
+func doesContextFielHaveLoop(head []byte, dep *gripdata.ContextFileWrap, db NodeNetContextdb) bool {
+	for _, dr := range dep.ContextFile.DependsOn {
 		if isThereDepLoop(head, dr, db) {
 			return true
 		}
@@ -127,7 +127,7 @@ func sendToContextParticipant(c gripcrypto.SignInf, ct *gripdata.ContextRequest,
 func findAndSendToContextParticipants(c gripcrypto.SignInf, ctxid []byte, db NodeNetContextdb) error {
 	clr := db.GetContextRequests(ctxid)
 	for _, ct := range clr {
-		err := sendToContextParticipant(c, &ct, db)
+		err := sendToContextParticipant(c, ct, db)
 		if err != nil {
 			return err
 		}

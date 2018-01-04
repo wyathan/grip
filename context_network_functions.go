@@ -108,7 +108,7 @@ func IncomingContextRequest(c *gripdata.ContextRequest, db NodeNetAccountContext
 	for _, ct := range clr {
 		//Also forward other context data to the target node, so if they
 		//accept they can forward the acceptance along to other nodes
-		err = CreateNewSend(&ct, c.TargetNodeID, db)
+		err = CreateNewSend(ct, c.TargetNodeID, db)
 		if err != nil {
 			return err
 		}

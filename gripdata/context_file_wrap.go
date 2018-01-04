@@ -23,8 +23,42 @@ type ContextFileWrap struct {
 //ContextFileWrapdb database interface that can only be called
 //while already within a transaction
 type ContextFileWrapdb interface {
-	TGetAllThatDependOn(cid []byte, dd []byte) []ContextFileWrap
+	TGetAllThatDependOn(cid []byte, dd []byte) []*ContextFileWrap
 	TGetContextFileByDepDataDig(dd []byte) *ContextFileWrap
+	TUpdateContextFileWrap(c *ContextFileWrap) error
+}
+
+//UpdateContextFileWrapDB to be called after the ContextFile has already been stored
+//while in the same transaction
+func (c *ContextFileWrap) UpdateContextFileWrapDB(db ContextFileWrapdb) error {
+	err := db.TUpdateContextFileWrap(c)
+	if err != nil {
+		return err
+	}
+	dependson := db.TGetAllThatDependOn(c.ContextFile.Context, c.ContextFile.DataDepDig)
+	deps := c.getDeps(db)
+	err = c.UpdateContextFileWrap(deps, dependson)
+	if err != nil {
+		return err
+	}
+	for _, d := range deps {
+		err := d.UpdateContextFileWrapDB(db)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *ContextFileWrap) getDeps(db ContextFileWrapdb) []*ContextFileWrap {
+	var deps []*ContextFileWrap
+	for _, d := range c.ContextFile.DependsOn {
+		dd := db.TGetContextFileByDepDataDig(d)
+		if dd != nil {
+			deps = append(deps, dd)
+		}
+	}
+	return deps
 }
 
 //UpdateContextFileWrap MUST be executed within a transaction to update

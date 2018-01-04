@@ -146,7 +146,7 @@ func sendNewContextRequestToOthers(c *gripdata.ContextRequest, ctx *gripdata.Con
 	//Reciprocate data with other nodes participating in the context
 	clr := db.GetContextRequests(c.ContextDig)
 	for _, ct := range clr {
-		err = reciprocateNewContextData(c, &ct, db)
+		err = reciprocateNewContextData(c, ct, db)
 		if err != nil {
 			return fmt.Errorf("Failed to reciprocate context data: %s", err)
 		}

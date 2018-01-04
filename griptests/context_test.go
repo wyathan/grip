@@ -11,7 +11,7 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
-func countContextRequests(m map[string][]gripdata.ContextRequest) int {
+func countContextRequests(m map[string][]*gripdata.ContextRequest) int {
 	cnt := 0
 	for _, rl := range m {
 		cnt += len(rl)
@@ -27,7 +27,7 @@ func countContextResponses(m map[string]map[string]*gripdata.ContextResponse) in
 	return cnt
 }
 
-func countContextFiles(m map[string][]gripdata.ContextFile) int {
+func countContextFiles(m map[string][]gripdata.ContextFileWrap) int {
 	cnt := 0
 	for _, rl := range m {
 		cnt += len(rl)

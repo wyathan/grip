@@ -27,13 +27,12 @@ type TestDB struct {
 	DigData              map[string]interface{}
 	NodeEphemera         map[string]*gripdata.NodeEphemera
 	Contexts             map[string]*gripdata.Context
-	ContextRequests      map[string][]gripdata.ContextRequest
+	ContextRequests      map[string][]*gripdata.ContextRequest
 	ContextResponses     map[string]map[string]*gripdata.ContextResponse
-	ContextFiles         map[string][]gripdata.ContextFile
-	ContextFilesByDepDig map[string]*gripdata.ContextFile
+	ContextFiles         map[string][]gripdata.ContextFileWrap
+	ContextFilesByDepDig map[string]*gripdata.ContextFileWrap
 	RejectedData         map[string][]gripdata.RejectedSendData
 	FileTransfers        map[string][]gripdata.ContextFileTransfer
-	ContextMessages      []gripdata.ContextMessage
 	VeryBadContextFiles  []gripdata.ContextFile
 }
 
@@ -51,12 +50,11 @@ func NewTestDB() *TestDB {
 	t.DigData = make(map[string]interface{})
 	t.NodeEphemera = make(map[string]*gripdata.NodeEphemera)
 	t.Contexts = make(map[string]*gripdata.Context)
-	t.ContextRequests = make(map[string][]gripdata.ContextRequest)
+	t.ContextRequests = make(map[string][]*gripdata.ContextRequest)
 	t.ContextResponses = make(map[string]map[string]*gripdata.ContextResponse)
-	t.ContextFiles = make(map[string][]gripdata.ContextFile)
+	t.ContextFiles = make(map[string][]gripdata.ContextFileWrap)
 	t.RejectedData = make(map[string][]gripdata.RejectedSendData)
-	t.ContextFilesByDepDig = make(map[string]*gripdata.ContextFile)
-	t.ContextMessages = make([]gripdata.ContextMessage)
+	t.ContextFilesByDepDig = make(map[string]*gripdata.ContextFileWrap)
 	return &t
 }
 

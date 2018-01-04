@@ -63,20 +63,19 @@ type Netdb interface {
 type Contextdb interface {
 	StoreContext(c *gripdata.Context) error
 	GetContext(id []byte) *gripdata.Context
-	GetContextRequests(id []byte) []gripdata.ContextRequest
+	GetContextRequests(id []byte) []*gripdata.ContextRequest
 	StoreContextRequest(c *gripdata.ContextRequest) error
 	GetContextRequest(cid []byte, tgtid []byte) *gripdata.ContextRequest
 	StoreContextResponse(c *gripdata.ContextResponse) error
 	GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextResponse
-	GetContextResponses(cid []byte) []gripdata.ContextResponse
-	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
+	GetContextResponses(cid []byte) []*gripdata.ContextResponse
+	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileWrap
 	//Never ever be able to access these as valid data!  Only for debug!
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile) error
-	GetAllThatDependOn(cid []byte, dig []byte) []gripdata.ContextFile
+	GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap
 	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
-	DeleteContextFile(c *gripdata.ContextFile) error
-	StoreContextMessage(c *gripdata.ContextMessage) error
+	DeleteContextFile(c *gripdata.ContextFileWrap) error
 }
 
 //NodeContextdb implements both Nodedb and Contextdb
