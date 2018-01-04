@@ -203,8 +203,10 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	if err != nil {
 		return err
 	}
-	//Store new context file
-	db.StoreContextFile(c)
+	err = db.StoreContextFile(c)
+	if err != nil {
+		return err
+	}
 	//Forward to other participants
 	err = SendToAllContextParticipants(c, c.Context, db)
 	if err != nil {

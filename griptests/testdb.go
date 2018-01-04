@@ -32,11 +32,14 @@ type TestDB struct {
 	ContextFiles         map[string][]gripdata.ContextFile
 	ContextFilesByDepDig map[string]*gripdata.ContextFile
 	RejectedData         map[string][]gripdata.RejectedSendData
+	FileTransfers        map[string][]gripdata.ContextFileTransfer
+	ContextMessages      []gripdata.ContextMessage
 	VeryBadContextFiles  []gripdata.ContextFile
 }
 
 func NewTestDB() *TestDB {
 	var t TestDB
+	t.FileTransfers = make(map[string][]gripdata.ContextFileTransfer)
 	t.Accounts = make(map[string]*gripdata.Account)
 	t.AccountKeys = make(map[string]*gripdata.NodeAccountKey)
 	t.NodeAccounts = make(map[string]*gripdata.NodeAccount)
@@ -53,6 +56,7 @@ func NewTestDB() *TestDB {
 	t.ContextFiles = make(map[string][]gripdata.ContextFile)
 	t.RejectedData = make(map[string][]gripdata.RejectedSendData)
 	t.ContextFilesByDepDig = make(map[string]*gripdata.ContextFile)
+	t.ContextMessages = make([]gripdata.ContextMessage)
 	return &t
 }
 

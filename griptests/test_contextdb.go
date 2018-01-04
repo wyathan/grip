@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 
+	"github.com/wyathan/grip"
 	"github.com/wyathan/grip/gripdata"
 )
 
@@ -19,6 +20,10 @@ import (
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile) error
+	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
+	SetContextHeadFile(c *gripdata.ContextFile) error
+	RemoveContextHeadFile(dig []byte) error
+	GetAllContextHeadFiles(cid []byte, index bool) []gripdata.ContextFile
 */
 
 func (t *TestDB) StoreContext(c *gripdata.Context) error {
@@ -121,6 +126,124 @@ func (t *TestDB) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
 	return nil
 }
 func (t *TestDB) GetAllThatDependOn(cid []byte, dig []byte) []gripdata.ContextFile {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
 	var r []gripdata.ContextFile
+	for _, fl := range t.ContextFiles[scid] {
+		if grip.DoesDependOn(dig, &fl) {
+			r = append(r, fl)
+		}
+	}
 	return r
+}
+func (t *TestDB) SetContextHeadFile(c *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	cid := base64.StdEncoding.EncodeToString(c.Context)
+	t.ContextFileHead[cid] = append(t.ContextFileHead[cid], *c)
+	return nil
+}
+func (t *TestDB) RemoveContextHeadFile(cid []byte, dig []byte) error {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFileHead[scid]
+	var nl []gripdata.ContextFile
+	for _, f := range fl {
+		if !bytes.Equal(f.DataDepDig, dig) {
+			nl = append(nl, f)
+		}
+	}
+	t.ContextFileHead[scid] = nl
+	return nil
+}
+func (t *TestDB) GetAllContextHeadFiles(cid []byte, index bool) []gripdata.ContextFile {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFileHead[scid]
+	var nl []gripdata.ContextFile
+	for _, f := range fl {
+		if f.Index == index {
+			nl = append(nl, f)
+		}
+	}
+	return nl
+}
+func (t *TestDB) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(c.TrasnferTo)
+	fl := t.FileTransfers[scid]
+	fl = append(fl, *c)
+	t.FileTransfers[scid] = fl
+	t.addDig(c)
+	return nil
+}
+func (t *TestDB) SetContextTailFile(c *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	cid := base64.StdEncoding.EncodeToString(c.Context)
+	t.ContextFileTail[cid] = append(t.ContextFileTail[cid], *c)
+	return nil
+}
+func (t *TestDB) RemoveContextTailFile(cid []byte, dig []byte) error {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFileTail[scid]
+	var nl []gripdata.ContextFile
+	for _, f := range fl {
+		if !bytes.Equal(f.DataDepDig, dig) {
+			nl = append(nl, f)
+		}
+	}
+	t.ContextFileTail[scid] = nl
+	return nil
+}
+func (t *TestDB) GetAllContextTailFiles(cid []byte, index bool) []gripdata.ContextFile {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFileTail[scid]
+	var nl []gripdata.ContextFile
+	for _, f := range fl {
+		if f.Index == index {
+			nl = append(nl, f)
+		}
+	}
+	return nl
+}
+func (t *TestDB) DeleteContextFile(c *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	scid := base64.StdEncoding.EncodeToString(c.Context)
+	fl := t.ContextFiles[scid]
+	var nl []gripdata.ContextFile
+	for _, f := range fl {
+		if !bytes.Equal(c.Dig, f.Dig) {
+			nl = append(nl, f)
+		}
+	}
+	t.ContextFiles[scid] = nl
+	nl = nil
+	fl = t.ContextFileHead[scid]
+	for _, f := range fl {
+		if !bytes.Equal(c.Dig, f.Dig) {
+			nl = append(nl, f)
+		}
+	}
+	t.ContextFileHead[scid] = nl
+	nl = nil
+	fl = t.ContextFileTail[scid]
+	for _, f := range fl {
+		if !bytes.Equal(c.Dig, f.Dig) {
+			nl = append(nl, f)
+		}
+	}
+	t.ContextFileTail[scid] = nl
+	scid = base64.StdEncoding.EncodeToString(c.DataDepDig)
+	delete(t.ContextFilesByDepDig, scid)
+	return nil
 }

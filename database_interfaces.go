@@ -74,6 +74,9 @@ type Contextdb interface {
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile) error
 	GetAllThatDependOn(cid []byte, dig []byte) []gripdata.ContextFile
+	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
+	DeleteContextFile(c *gripdata.ContextFile) error
+	StoreContextMessage(c *gripdata.ContextMessage) error
 }
 
 //NodeContextdb implements both Nodedb and Contextdb

@@ -216,9 +216,5 @@ func NewContextFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
 	if err != nil {
 		return err
 	}
-	err = SendToAllContextParticipants(c, c.Context, db)
-	if err != nil {
-		return err
-	}
-	return nil
+	return SendToAllContextParticipants(c, c.Context, db)
 }
