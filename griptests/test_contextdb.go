@@ -18,7 +18,7 @@ import (
 	GetContextResponses(cid []byte) []gripdata.ContextResponse
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
-	StoreContextFile(c *gripdata.ContextFile) error
+	StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error)
 	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
 	SetContextHeadFile(c *gripdata.ContextFile) error
 	RemoveContextHeadFile(dig []byte) error
@@ -93,8 +93,7 @@ func (t *TestDB) GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextR
 func (t *TestDB) GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileWrap {
 	t.Lock()
 	defer t.Unlock()
-	dd := base64.StdEncoding.EncodeToString(d)
-	return t.ContextFilesByDepDig[dd]
+	return t.TGetContextFileByDepDataDig(d)
 }
 func (t *TestDB) GetContextResponses(cid []byte) []*gripdata.ContextResponse {
 	t.Lock()
@@ -107,7 +106,7 @@ func (t *TestDB) GetContextResponses(cid []byte) []*gripdata.ContextResponse {
 	}
 	return nil
 }
-func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile) error {
+func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile) (*gripdata.ContextFileWrap, error) {
 	t.Lock()
 	defer t.Unlock()
 	cid := base64.StdEncoding.EncodeToString(cf.Context)
@@ -118,7 +117,7 @@ func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile) error {
 	fl := t.ContextFiles[cid]
 	t.ContextFiles[cid] = append(fl, c)
 	t.addDig(c.ContextFile)
-	return c.UpdateContextFileWrapDB(t)
+	return &c, c.UpdateContextFileWrapDB(t)
 }
 func (t *TestDB) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
 	t.Lock()
@@ -162,16 +161,57 @@ func (t *TestDB) TGetAllThatDependOn(cid []byte, dig []byte) []*gripdata.Context
 	var r []*gripdata.ContextFileWrap
 	for _, fl := range t.ContextFiles[scid] {
 		if gripdata.DoesDependOn(dig, fl.ContextFile) {
-			r = append(r, &fl)
+			v := fl
+			r = append(r, &v)
 		}
 	}
 	return r
 }
 func (t *TestDB) TGetContextFileByDepDataDig(dd []byte) *gripdata.ContextFileWrap {
+	sdd := base64.StdEncoding.EncodeToString(dd)
+	return t.ContextFilesByDepDig[sdd]
+}
+func (t *TestDB) TUpdateContextFileWrap(cf *gripdata.ContextFileWrap) error {
+	cid := base64.StdEncoding.EncodeToString(cf.ContextFile.Context)
+	dd := base64.StdEncoding.EncodeToString(cf.ContextFile.DataDepDig)
+	t.ContextFilesByDepDig[dd] = cf
+	fl := t.ContextFiles[cid]
+	fnd := false
+	for c := 0; c < len(fl); c++ {
+		if bytes.Equal(cf.ContextFile.Dig, fl[c].ContextFile.Dig) {
+			fl[c] = *cf
+			fnd = true
+		}
+	}
+	if !fnd {
+		t.ContextFiles[cid] = append(fl, *cf)
+	}
+	t.addDig(cf.ContextFile)
 	return nil
 }
-func (t *TestDB) TUpdateContextFileWrap(c *gripdata.ContextFileWrap) error {
-	return nil
+func (t *TestDB) GetContextHeads(cid []byte) []*gripdata.ContextFileWrap {
+	var r []*gripdata.ContextFileWrap
+	sc := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFiles[sc]
+	for _, d := range fl {
+		if d.Head {
+			v := d
+			r = append(r, &v)
+		}
+	}
+	return r
+}
+func (t *TestDB) GetContextLeafs(cid []byte) []*gripdata.ContextFileWrap {
+	var r []*gripdata.ContextFileWrap
+	sc := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFiles[sc]
+	for _, d := range fl {
+		if d.Leaf {
+			v := d
+			r = append(r, &v)
+		}
+	}
+	return r
 }
 
 //testTestDBImplements make sure we implement the interfaces

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"log"
 )
 
 //ContextFileWrap wraps ContextFile to keep track
@@ -41,6 +42,10 @@ func (c *ContextFileWrap) UpdateContextFileWrapDB(db ContextFileWrapdb) error {
 	if err != nil {
 		return err
 	}
+	err = db.TUpdateContextFileWrap(c)
+	if err != nil {
+		return err
+	}
 	for _, d := range deps {
 		err := d.UpdateContextFileWrapDB(db)
 		if err != nil {
@@ -71,6 +76,7 @@ func (c *ContextFileWrap) UpdateContextFileWrap(deps []*ContextFileWrap, dependo
 	covered, depth := getDepthCovered(dependon)
 	c.CoveredBySnapshot = covered
 	c.Depth = depth
+	log.Printf("---==>>  File %s set depth: %d", string(c.ContextFile.DataDepDig), c.Depth)
 	c.Head = len(dependon) == 0
 	c.Leaf = len(deps) == 0
 	return nil
@@ -80,6 +86,7 @@ func getDepthCovered(dependon []*ContextFileWrap) (bool, int) {
 	depth := 0
 	covered := len(dependon) > 0
 	for _, d := range dependon {
+		log.Printf("\\\\ Checking depth of %s which is: %d", string(d.ContextFile.DataDepDig), d.Depth)
 		if d.Depth+1 > depth {
 			depth = d.Depth + 1
 		}

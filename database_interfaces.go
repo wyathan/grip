@@ -72,10 +72,12 @@ type Contextdb interface {
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileWrap
 	//Never ever be able to access these as valid data!  Only for debug!
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
-	StoreContextFile(c *gripdata.ContextFile) error
+	StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error)
 	GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap
 	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
 	DeleteContextFile(c *gripdata.ContextFileWrap) error
+	GetContextHeads(cid []byte) []*gripdata.ContextFileWrap
+	GetContextLeafs(cid []byte) []*gripdata.ContextFileWrap
 }
 
 //NodeContextdb implements both Nodedb and Contextdb

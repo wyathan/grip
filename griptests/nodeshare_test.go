@@ -132,6 +132,7 @@ func createSomeNodes(num int) (tn *TestNetwork, nodes []*gripdata.Node, pnodes [
 //TestNodeShare does that
 func TestNodeShare(t *testing.T) {
 	go func() {
+		//http://localhost:6060/debug/pprof/goroutine?debug=2
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 

@@ -212,7 +212,7 @@ func NewContextFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
 	if err != nil {
 		return err
 	}
-	err = db.StoreContextFile(c)
+	_, err = db.StoreContextFile(c)
 	if err != nil {
 		return err
 	}

@@ -19,16 +19,17 @@ type ContextFile struct {
 	DataDepDig  []byte //Digest of Index, Snapshot, DependsOn, Context, and the contents of Path
 	Dig         []byte //This record's digest
 	Sig         []byte //Signed by NodeID private key
-	//Values set specific to the node they are on, so they
-	//cannot be included in the digest fuction and should not
-	//be transfered to other nodes
-	IsLeaf bool //Is this the last file in a dependency tree
 }
 
 func xorBytes(a []byte, b []byte) {
 	for c := 0; c < len(a) && c < len(b); c++ {
 		a[c] = a[c] ^ b[c]
 	}
+}
+
+func (a *ContextFile) PushDep(dd []byte) *ContextFile {
+	a.DependsOn = append(a.DependsOn, dd)
+	return a
 }
 
 //Digest ContextFile
