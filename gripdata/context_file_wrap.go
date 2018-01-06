@@ -19,6 +19,7 @@ type ContextFileWrap struct {
 	Leaf              bool //is this file at the leaf/tail of dep tree path
 	Depth             int  //how long is it from the head to this node
 	CoveredBySnapshot bool //do all the dependencies of this file covered by snapshots
+	Unconstructable   bool //Lost the ability to use locally due to deleting files
 }
 
 //ContextFileWrapdb database interface that can only be called
@@ -32,6 +33,9 @@ type ContextFileWrapdb interface {
 //UpdateContextFileWrapDB to be called after the ContextFile has already been stored
 //while in the same transaction
 func (c *ContextFileWrap) UpdateContextFileWrapDB(db ContextFileWrapdb) error {
+	if len(c.ContextFile.DependsOn) == 0 && !c.ContextFile.Snapshot {
+		return errors.New("No dependencies must be a snapshot")
+	}
 	err := db.TUpdateContextFileWrap(c)
 	if err != nil {
 		return err

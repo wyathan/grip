@@ -36,6 +36,7 @@ func TestContextFileWrap(t *testing.T) {
 	db := NewTestDB()
 
 	n1 := CreateTestContextFile("context", "1", "dd1")
+	n1.Snapshot = true
 	w1, err := db.StoreContextFile(n1)
 	if err != nil || !(w1.Depth == 0 && w1.Head && w1.Leaf) {
 		t.Error()
@@ -52,6 +53,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n3 := CreateTestContextFile("context", "3", "dd3")
+	n3.Snapshot = true
 	w3, err3 := db.StoreContextFile(n3)
 	if err3 != nil || !(w3.Depth == 0 && w3.Head && w3.Leaf) {
 		t.Error()
@@ -120,131 +122,135 @@ func TestContextFileWrap(t *testing.T) {
 		t.Error()
 	}
 
+	// 6: 4, 5, 3, 2, 1
 	n6 := CreateTestContextFile("context", "6", "dd6").PushDep(n4.DataDepDig).PushDep(n5.DataDepDig)
+	n6.Snapshot = true
 	w6, err6 := db.StoreContextFile(n6)
-	if err6 != nil || !(w6.Depth == 0 && w6.Head && !w6.Leaf) {
+	if err6 != nil || !(w6.Depth == 0 && w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
 	w5 = db.GetContextFileByDepDataDig(n5.DataDepDig)
-	if !(w5.Depth == 1 && !w5.Head && !w5.Leaf) {
+	if !(w5.Depth == 1 && !w5.Head && !w5.Leaf && w5.CoveredBySnapshot) {
 		t.Error()
 	}
 	w4 = db.GetContextFileByDepDataDig(n4.DataDepDig)
-	if !(w4.Depth == 1 && !w4.Head && !w4.Leaf) {
+	if !(w4.Depth == 1 && !w4.Head && !w4.Leaf && w4.CoveredBySnapshot) {
 		t.Error()
 	}
 	w3 = db.GetContextFileByDepDataDig(n3.DataDepDig)
-	if !(w3.Depth == 2 && !w3.Head && w3.Leaf) {
+	if !(w3.Depth == 2 && !w3.Head && w3.Leaf && w3.CoveredBySnapshot) {
 		t.Error()
 	}
 	w2 = db.GetContextFileByDepDataDig(n2.DataDepDig)
-	if !(w2.Depth == 2 && !w2.Head && !w2.Leaf) {
+	if !(w2.Depth == 2 && !w2.Head && !w2.Leaf && w2.CoveredBySnapshot) {
 		t.Error()
 	}
 	w1 = db.GetContextFileByDepDataDig(n1.DataDepDig)
-	if !(w1.Depth == 3 && !w1.Head && w1.Leaf) {
+	if !(w1.Depth == 3 && !w1.Head && w1.Leaf && w1.CoveredBySnapshot) {
 		t.Error()
 	}
 
+	// 7: 4, 5, 3, 2, 1
 	n7 := CreateTestContextFile("context", "7", "dd7").PushDep(n6.DataDepDig)
 	w7, err7 := db.StoreContextFile(n7)
-	if err7 != nil || !(w7.Depth == 0 && w7.Head && !w7.Leaf) {
+	if err7 != nil || !(w7.Depth == 0 && w7.Head && !w7.Leaf && !w7.CoveredBySnapshot) {
 		t.Error()
 	}
 	w6 = db.GetContextFileByDepDataDig(n6.DataDepDig)
-	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf) {
+	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
 	w5 = db.GetContextFileByDepDataDig(n5.DataDepDig)
-	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf) {
+	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf && w5.CoveredBySnapshot) {
 		t.Error()
 	}
 	w4 = db.GetContextFileByDepDataDig(n4.DataDepDig)
-	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf) {
+	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf && w4.CoveredBySnapshot) {
 		t.Error()
 	}
 	w3 = db.GetContextFileByDepDataDig(n3.DataDepDig)
-	if !(w3.Depth == 3 && !w3.Head && w3.Leaf) {
+	if !(w3.Depth == 3 && !w3.Head && w3.Leaf && w3.CoveredBySnapshot) {
 		t.Error()
 	}
 	w2 = db.GetContextFileByDepDataDig(n2.DataDepDig)
-	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf) {
+	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf && w2.CoveredBySnapshot) {
 		t.Error()
 	}
 	w1 = db.GetContextFileByDepDataDig(n1.DataDepDig)
-	if !(w1.Depth == 4 && !w1.Head && w1.Leaf) {
+	if !(w1.Depth == 4 && !w1.Head && w1.Leaf && w1.CoveredBySnapshot) {
 		t.Error()
 	}
 
+	// 8: 4, 3
 	n8 := CreateTestContextFile("context", "8", "dd8").PushDep(n5.DataDepDig)
 	w8, err8 := db.StoreContextFile(n8)
-	if err8 != nil || !(w8.Depth == 0 && w8.Head && !w8.Leaf) {
+	if err8 != nil || !(w8.Depth == 0 && w8.Head && !w8.Leaf && !w8.CoveredBySnapshot) {
 		t.Error()
 	}
 	w7 = db.GetContextFileByDepDataDig(n7.DataDepDig)
-	if !(w7.Depth == 0 && w7.Head && !w7.Leaf) {
+	if !(w7.Depth == 0 && w7.Head && !w7.Leaf && !w7.CoveredBySnapshot) {
 		t.Error()
 	}
 	w6 = db.GetContextFileByDepDataDig(n6.DataDepDig)
-	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf) {
+	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
 	w5 = db.GetContextFileByDepDataDig(n5.DataDepDig)
-	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf) {
+	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf && !w5.CoveredBySnapshot) {
 		t.Error()
 	}
 	w4 = db.GetContextFileByDepDataDig(n4.DataDepDig)
-	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf) {
+	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf && w4.CoveredBySnapshot) {
 		t.Error()
 	}
 	w3 = db.GetContextFileByDepDataDig(n3.DataDepDig)
-	if !(w3.Depth == 3 && !w3.Head && w3.Leaf) {
+	if !(w3.Depth == 3 && !w3.Head && w3.Leaf && w3.CoveredBySnapshot) {
 		t.Error()
 	}
 	w2 = db.GetContextFileByDepDataDig(n2.DataDepDig)
-	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf) {
+	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf && !w2.CoveredBySnapshot) {
 		t.Error()
 	}
 	w1 = db.GetContextFileByDepDataDig(n1.DataDepDig)
-	if !(w1.Depth == 4 && !w1.Head && w1.Leaf) {
+	if !(w1.Depth == 4 && !w1.Head && w1.Leaf && !w1.CoveredBySnapshot) {
 		t.Error()
 	}
 
 	n9 := CreateTestContextFile("context", "9", "dd9").PushDep(n4.DataDepDig)
 	w9, err9 := db.StoreContextFile(n9)
-	if err9 != nil || !(w9.Depth == 0 && w9.Head && !w9.Leaf) {
+	if err9 != nil || !(w9.Depth == 0 && w9.Head && !w9.Leaf && !w9.CoveredBySnapshot) {
 		t.Error()
 	}
 	w8 = db.GetContextFileByDepDataDig(n8.DataDepDig)
-	if !(w8.Depth == 0 && w8.Head && !w8.Leaf) {
+	if !(w8.Depth == 0 && w8.Head && !w8.Leaf && !w8.CoveredBySnapshot) {
 		t.Error()
 	}
 	w7 = db.GetContextFileByDepDataDig(n7.DataDepDig)
-	if !(w7.Depth == 0 && w7.Head && !w7.Leaf) {
+	if !(w7.Depth == 0 && w7.Head && !w7.Leaf && !w7.CoveredBySnapshot) {
 		t.Error()
 	}
 	w6 = db.GetContextFileByDepDataDig(n6.DataDepDig)
-	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf) {
+	if !(w6.Depth == 1 && !w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
 	w5 = db.GetContextFileByDepDataDig(n5.DataDepDig)
-	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf) {
+	if !(w5.Depth == 2 && !w5.Head && !w5.Leaf && !w5.CoveredBySnapshot) {
 		t.Error()
 	}
 	w4 = db.GetContextFileByDepDataDig(n4.DataDepDig)
-	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf) {
+	if !(w4.Depth == 2 && !w4.Head && !w4.Leaf && !w4.CoveredBySnapshot) {
 		t.Error()
 	}
 	w3 = db.GetContextFileByDepDataDig(n3.DataDepDig)
-	if !(w3.Depth == 3 && !w3.Head && w3.Leaf) {
+	if !(w3.Depth == 3 && !w3.Head && w3.Leaf && !w3.CoveredBySnapshot) {
 		t.Error()
 	}
 	w2 = db.GetContextFileByDepDataDig(n2.DataDepDig)
-	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf) {
+	if !(w2.Depth == 3 && !w2.Head && !w2.Leaf && !w2.CoveredBySnapshot) {
 		t.Error()
 	}
 	w1 = db.GetContextFileByDepDataDig(n1.DataDepDig)
-	if !(w1.Depth == 4 && !w1.Head && w1.Leaf) {
+	if !(w1.Depth == 4 && !w1.Head && w1.Leaf && !w1.CoveredBySnapshot) {
 		t.Error()
 	}
 
@@ -441,6 +447,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n14 := CreateTestContextFile("context", "14", "dd14")
+	n14.Snapshot = true
 	w14, err14 := db.StoreContextFile(n14)
 	if err14 != nil || !(w14.Depth == 0 && w14.Head && w14.Leaf) {
 		t.Error()
@@ -499,60 +506,65 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n15 := CreateTestContextFile("context", "15", "dd15").PushDep(n7.DataDepDig)
+	n15.Snapshot = true
 	w15, err15 := db.StoreContextFile(n15)
-	if err15 != nil || !(w15.Depth == 0 && w15.Head && !w15.Leaf) {
+	if err15 != nil || !(w15.Depth == 0 && w15.Head && !w15.Leaf && !w15.CoveredBySnapshot) {
+		t.Error()
+	}
+	w14 = db.GetContextFileByDepDataDig(n14.DataDepDig)
+	if !(w14.Depth == 0 && w14.Head && w14.Leaf && !w14.CoveredBySnapshot) {
 		t.Error()
 	}
 	w13 = db.GetContextFileByDepDataDig(n13.DataDepDig)
-	if !(w13.Depth == 0 && w13.Head && !w13.Leaf) {
+	if !(w13.Depth == 0 && w13.Head && !w13.Leaf && !w13.CoveredBySnapshot) {
 		t.Error()
 	}
 	w12 = db.GetContextFileByDepDataDig(n12.DataDepDig)
-	if !(w12.Depth == 0 && w12.Head && !w12.Leaf) {
+	if !(w12.Depth == 0 && w12.Head && !w12.Leaf && !w12.CoveredBySnapshot) {
 		t.Error()
 	}
 	w11 = db.GetContextFileByDepDataDig(n11.DataDepDig)
-	if !(w11.Depth == 0 && w11.Head && !w11.Leaf) {
+	if !(w11.Depth == 0 && w11.Head && !w11.Leaf && !w11.CoveredBySnapshot) {
 		t.Error()
 	}
 	w10 = db.GetContextFileByDepDataDig(n10.DataDepDig)
-	if !(w10.Depth == 0 && w10.Head && !w10.Leaf) {
+	if !(w10.Depth == 0 && w10.Head && !w10.Leaf && !w10.CoveredBySnapshot) {
 		t.Error()
 	}
 	w9 = db.GetContextFileByDepDataDig(n9.DataDepDig)
-	if !(w9.Depth == 1 && !w9.Head && !w9.Leaf) {
+	if !(w9.Depth == 1 && !w9.Head && !w9.Leaf && !w9.CoveredBySnapshot) {
 		t.Error()
 	}
 	w8 = db.GetContextFileByDepDataDig(n8.DataDepDig)
-	if !(w8.Depth == 1 && !w8.Head && !w8.Leaf) {
+	if !(w8.Depth == 1 && !w8.Head && !w8.Leaf && !w8.CoveredBySnapshot) {
 		t.Error()
 	}
 	w7 = db.GetContextFileByDepDataDig(n7.DataDepDig)
-	if !(w7.Depth == 1 && !w7.Head && !w7.Leaf) {
+	if !(w7.Depth == 1 && !w7.Head && !w7.Leaf && w7.CoveredBySnapshot) {
 		t.Error()
 	}
 	w6 = db.GetContextFileByDepDataDig(n6.DataDepDig)
-	if !(w6.Depth == 2 && !w6.Head && !w6.Leaf) {
+	if !(w6.Depth == 2 && !w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
 	w5 = db.GetContextFileByDepDataDig(n5.DataDepDig)
-	if !(w5.Depth == 3 && !w5.Head && !w5.Leaf) {
+	if !(w5.Depth == 3 && !w5.Head && !w5.Leaf && !w5.CoveredBySnapshot) {
 		t.Error()
 	}
 	w4 = db.GetContextFileByDepDataDig(n4.DataDepDig)
-	if !(w4.Depth == 3 && !w4.Head && !w4.Leaf) {
+	if !(w4.Depth == 3 && !w4.Head && !w4.Leaf && !w4.CoveredBySnapshot) {
 		t.Error()
 	}
 	w3 = db.GetContextFileByDepDataDig(n3.DataDepDig)
-	if !(w3.Depth == 4 && !w3.Head && w3.Leaf) {
+	if !(w3.Depth == 4 && !w3.Head && w3.Leaf && !w3.CoveredBySnapshot) {
 		t.Error()
 	}
 	w2 = db.GetContextFileByDepDataDig(n2.DataDepDig)
-	if !(w2.Depth == 4 && !w2.Head && !w2.Leaf) {
+	if !(w2.Depth == 4 && !w2.Head && !w2.Leaf && !w2.CoveredBySnapshot) {
 		t.Error()
 	}
 	w1 = db.GetContextFileByDepDataDig(n1.DataDepDig)
-	if !(w1.Depth == 5 && !w1.Head && w1.Leaf) {
+	if !(w1.Depth == 5 && !w1.Head && w1.Leaf && !w1.CoveredBySnapshot) {
 		t.Error()
 	}
 }
