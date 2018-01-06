@@ -11,7 +11,6 @@ type ContextFile struct {
 	Index       bool
 	Snapshot    bool
 	DependsOn   [][]byte
-	Path        string
 	ContextUser string //If a logged in context user submitted this
 	NodeID      []byte //Node ID of creating node
 	CreatedOn   uint64 //Time stamp
@@ -19,12 +18,22 @@ type ContextFile struct {
 	DataDepDig  []byte //Digest of Index, Snapshot, DependsOn, Context, and the contents of Path
 	Dig         []byte //This record's digest
 	Sig         []byte //Signed by NodeID private key
+	//path is private
+	path string
 }
 
 func xorBytes(a []byte, b []byte) {
 	for c := 0; c < len(a) && c < len(b); c++ {
 		a[c] = a[c] ^ b[c]
 	}
+}
+
+func (a *ContextFile) GetPath() string {
+	return a.path
+}
+
+func (a *ContextFile) SetPath(p string) {
+	a.path = p
 }
 
 func (a *ContextFile) PushDep(dd []byte) *ContextFile {
@@ -51,7 +60,7 @@ func (a *ContextFile) Digest() []byte {
 		gripcrypto.HashBytes(h, depbs)
 	}
 	gripcrypto.HashBytes(h, a.Context)
-	gripcrypto.HashFile(h, a.Path)
+	gripcrypto.HashFile(h, a.path)
 	a.DataDepDig = h.Sum(nil)
 	h = sha512.New()
 	gripcrypto.HashBytes(h, a.DataDepDig)

@@ -155,7 +155,7 @@ func SendToAllContextParticipants(c gripcrypto.SignInf, ctxid []byte, db NodeNet
 }
 
 func validateFile(c *gripdata.ContextFile) error {
-	st, err := os.Stat(c.Path)
+	st, err := os.Stat(c.GetPath())
 	if os.IsNotExist(err) {
 		return errors.New("Path does not exist")
 	}
@@ -206,13 +206,21 @@ func validateAndSignContextFile(c *gripdata.ContextFile, db NodeNetContextdb) er
 	return validateContextFileDepsAndSign(c, db)
 }
 
+func GetFileSize(p string) int64 {
+	st, err := os.Stat(p)
+	if err != nil {
+		return 0
+	}
+	return st.Size()
+}
+
 //NewContextFile add a new file for a context
 func NewContextFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
 	err := validateAndSignContextFile(c, db)
 	if err != nil {
 		return err
 	}
-	_, err = db.StoreContextFile(c)
+	_, err = db.StoreContextFile(c, GetFileSize(c.GetPath()))
 	if err != nil {
 		return err
 	}

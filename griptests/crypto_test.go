@@ -100,7 +100,7 @@ func TestContextFileDigest(t *testing.T) {
 	}
 	b := []byte("This is a test file for checking ContextFile digest")
 	ioutil.WriteFile("testfile", b, 0x777)
-	n.Path = "testfile"
+	n.SetPath("testfile")
 	n.Digest()
 	if n.Dig == nil {
 		t.Error("Digest is nil")
@@ -119,7 +119,7 @@ func TestContextFileDigest(t *testing.T) {
 
 	b = []byte("Th1s is a test file for checking ContextFile digest")
 	ioutil.WriteFile("testfile2", b, 0x777)
-	m.Path = "testfile2"
+	m.SetPath("testfile2")
 
 	m.Digest()
 

@@ -163,7 +163,7 @@ func TestContexts(t *testing.T) {
 
 	var f gripdata.ContextFile
 	f.Context = ctx.Dig
-	f.Path = MakeTempFile()
+	f.SetPath(MakeTempFile())
 	err = grip.NewContextFile(&f, dbs[1])
 	if err != nil {
 		t.Errorf("Failed to create new context file: %s", err)

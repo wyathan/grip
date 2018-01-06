@@ -18,7 +18,7 @@ import (
 	GetContextResponses(cid []byte) []gripdata.ContextResponse
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
-	StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error)
+	StoreContextFile(c *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error)
 	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
 	SetContextHeadFile(c *gripdata.ContextFile) error
 	RemoveContextHeadFile(dig []byte) error
@@ -106,13 +106,14 @@ func (t *TestDB) GetContextResponses(cid []byte) []*gripdata.ContextResponse {
 	}
 	return nil
 }
-func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile) (*gripdata.ContextFileWrap, error) {
+func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error) {
 	t.Lock()
 	defer t.Unlock()
 	cid := base64.StdEncoding.EncodeToString(cf.Context)
 	dd := base64.StdEncoding.EncodeToString(cf.DataDepDig)
 	var c gripdata.ContextFileWrap
 	c.ContextFile = cf
+	c.Size = s
 	t.ContextFilesByDepDig[dd] = &c
 	fl := t.ContextFiles[cid]
 	t.ContextFiles[cid] = append(fl, c)
@@ -201,17 +202,90 @@ func (t *TestDB) GetContextHeads(cid []byte) []*gripdata.ContextFileWrap {
 	}
 	return r
 }
-func (t *TestDB) GetContextLeafs(cid []byte) []*gripdata.ContextFileWrap {
+func (t *TestDB) GetContextLeaves(cid []byte, covered bool, index bool) []*gripdata.ContextFileWrap {
 	var r []*gripdata.ContextFileWrap
 	sc := base64.StdEncoding.EncodeToString(cid)
 	fl := t.ContextFiles[sc]
 	for _, d := range fl {
-		if d.Leaf {
+		if d.Leaf && d.CoveredBySnapshot == covered && d.ContextFile.Index == index {
 			v := d
 			r = append(r, &v)
 		}
 	}
+	r = mergeSortSize(r)
+	r = mergeSortDepth(r)
 	return r
+}
+func (t *TestDB) GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap {
+	var r []*gripdata.ContextFileWrap
+	sc := base64.StdEncoding.EncodeToString(cid)
+	fl := t.ContextFiles[sc]
+	for _, d := range fl {
+		if d.ContextFile.Snapshot && d.CoveredBySnapshot {
+			v := d
+			r = append(r, &v)
+		}
+	}
+	r = mergeSortSize(r)
+	r = mergeSortDepth(r)
+	return r
+}
+
+type depthCompare struct{}
+
+func (d *depthCompare) Compare(a *gripdata.ContextFileWrap, b *gripdata.ContextFileWrap) int {
+	return a.Depth - b.Depth
+}
+
+func mergeSortDepth(s []*gripdata.ContextFileWrap) []*gripdata.ContextFileWrap {
+	return mergeSortContextFileWrap(s, &depthCompare{})
+}
+
+type sizeCompare struct{}
+
+func (d *sizeCompare) Compare(a *gripdata.ContextFileWrap, b *gripdata.ContextFileWrap) int {
+	return int(a.Size - b.Size)
+}
+
+func mergeSortSize(s []*gripdata.ContextFileWrap) []*gripdata.ContextFileWrap {
+	return mergeSortContextFileWrap(s, &sizeCompare{})
+}
+
+type compareContextFileWrap interface {
+	Compare(a *gripdata.ContextFileWrap, b *gripdata.ContextFileWrap) int
+}
+
+//Using merge sort because it's stable so we can sort size the depth
+func mergeSortContextFileWrap(s []*gripdata.ContextFileWrap, cmp compareContextFileWrap) []*gripdata.ContextFileWrap {
+	var mr [][]*gripdata.ContextFileWrap
+	for c := 0; c < len(s); c++ {
+		mr = append(mr, s[c:c+1])
+	}
+	for len(mr) > 1 {
+		mr = append(doMergeSortContextFileWrap(mr[0], mr[1], cmp), mr[2:]...)
+
+	}
+	return mr[0]
+}
+
+func doMergeSortContextFileWrap(s0 []*gripdata.ContextFileWrap, s1 []*gripdata.ContextFileWrap, cmp compareContextFileWrap) [][]*gripdata.ContextFileWrap {
+	var r []*gripdata.ContextFileWrap
+	for len(s0) > 0 && len(s1) > 0 {
+		if cmp.Compare(s0[0], s1[0]) > 0 {
+			r = append(r, s0[0])
+			s0 = s0[1:]
+		} else {
+			r = append(r, s1[0])
+			s1 = s1[1:]
+		}
+	}
+	if len(s0) > 0 {
+		r = append(r, s0...)
+	}
+	if len(s1) > 0 {
+		r = append(r, s1...)
+	}
+	return [][]*gripdata.ContextFileWrap{r}
 }
 
 //testTestDBImplements make sure we implement the interfaces

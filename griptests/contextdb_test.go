@@ -37,13 +37,13 @@ func TestContextFileWrap(t *testing.T) {
 
 	n1 := CreateTestContextFile("context", "1", "dd1")
 	n1.Snapshot = true
-	w1, err := db.StoreContextFile(n1)
+	w1, err := db.StoreContextFile(n1, 10)
 	if err != nil || !(w1.Depth == 0 && w1.Head && w1.Leaf) {
 		t.Error()
 	}
 
 	n2 := CreateTestContextFile("context", "2", "dd2").PushDep(n1.DataDepDig)
-	w2, err2 := db.StoreContextFile(n2)
+	w2, err2 := db.StoreContextFile(n2, 10)
 	if err2 != nil || !(w2.Depth == 0 && w2.Head && !w2.Leaf) {
 		t.Error()
 	}
@@ -54,7 +54,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	n3 := CreateTestContextFile("context", "3", "dd3")
 	n3.Snapshot = true
-	w3, err3 := db.StoreContextFile(n3)
+	w3, err3 := db.StoreContextFile(n3, 10)
 	if err3 != nil || !(w3.Depth == 0 && w3.Head && w3.Leaf) {
 		t.Error()
 	}
@@ -68,7 +68,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n4 := CreateTestContextFile("context", "4", "dd4").PushDep(n3.DataDepDig)
-	w4, err4 := db.StoreContextFile(n4)
+	w4, err4 := db.StoreContextFile(n4, 10)
 	if err4 != nil || !(w4.Depth == 0 && w4.Head && !w4.Leaf) {
 		t.Error()
 	}
@@ -86,7 +86,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n5 := CreateTestContextFile("context", "5", "dd5").PushDep(n2.DataDepDig)
-	w5, err5 := db.StoreContextFile(n5)
+	w5, err5 := db.StoreContextFile(n5, 10)
 	if err5 != nil || !(w5.Depth == 0 && w5.Head && !w5.Leaf) {
 		if err5 != nil {
 			fmt.Printf("Error is not nil %s", err5)
@@ -125,7 +125,7 @@ func TestContextFileWrap(t *testing.T) {
 	// 6: 4, 5, 3, 2, 1
 	n6 := CreateTestContextFile("context", "6", "dd6").PushDep(n4.DataDepDig).PushDep(n5.DataDepDig)
 	n6.Snapshot = true
-	w6, err6 := db.StoreContextFile(n6)
+	w6, err6 := db.StoreContextFile(n6, 10)
 	if err6 != nil || !(w6.Depth == 0 && w6.Head && !w6.Leaf && !w6.CoveredBySnapshot) {
 		t.Error()
 	}
@@ -152,7 +152,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	// 7: 4, 5, 3, 2, 1
 	n7 := CreateTestContextFile("context", "7", "dd7").PushDep(n6.DataDepDig)
-	w7, err7 := db.StoreContextFile(n7)
+	w7, err7 := db.StoreContextFile(n7, 10)
 	if err7 != nil || !(w7.Depth == 0 && w7.Head && !w7.Leaf && !w7.CoveredBySnapshot) {
 		t.Error()
 	}
@@ -183,7 +183,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	// 8: 4, 3
 	n8 := CreateTestContextFile("context", "8", "dd8").PushDep(n5.DataDepDig)
-	w8, err8 := db.StoreContextFile(n8)
+	w8, err8 := db.StoreContextFile(n8, 10)
 	if err8 != nil || !(w8.Depth == 0 && w8.Head && !w8.Leaf && !w8.CoveredBySnapshot) {
 		t.Error()
 	}
@@ -217,7 +217,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n9 := CreateTestContextFile("context", "9", "dd9").PushDep(n4.DataDepDig)
-	w9, err9 := db.StoreContextFile(n9)
+	w9, err9 := db.StoreContextFile(n9, 10)
 	if err9 != nil || !(w9.Depth == 0 && w9.Head && !w9.Leaf && !w9.CoveredBySnapshot) {
 		t.Error()
 	}
@@ -255,7 +255,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n10 := CreateTestContextFile("context", "10", "dd10").PushDep(n9.DataDepDig)
-	w10, err10 := db.StoreContextFile(n10)
+	w10, err10 := db.StoreContextFile(n10, 10)
 	if err10 != nil || !(w10.Depth == 0 && w10.Head && !w10.Leaf) {
 		t.Error()
 	}
@@ -297,7 +297,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n11 := CreateTestContextFile("context", "11", "dd11").PushDep(n8.DataDepDig)
-	w11, err11 := db.StoreContextFile(n11)
+	w11, err11 := db.StoreContextFile(n11, 10)
 	if err11 != nil || !(w11.Depth == 0 && w11.Head && !w11.Leaf) {
 		t.Error()
 	}
@@ -343,7 +343,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n12 := CreateTestContextFile("context", "12", "dd12").PushDep(n6.DataDepDig)
-	w12, err12 := db.StoreContextFile(n12)
+	w12, err12 := db.StoreContextFile(n12, 10)
 	if err12 != nil || !(w12.Depth == 0 && w12.Head && !w12.Leaf) {
 		t.Error()
 	}
@@ -393,7 +393,7 @@ func TestContextFileWrap(t *testing.T) {
 	}
 
 	n13 := CreateTestContextFile("context", "13", "dd13").PushDep(n2.DataDepDig)
-	w13, err13 := db.StoreContextFile(n13)
+	w13, err13 := db.StoreContextFile(n13, 10)
 	if err13 != nil || !(w13.Depth == 0 && w13.Head && !w13.Leaf) {
 		t.Error()
 	}
@@ -448,7 +448,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	n14 := CreateTestContextFile("context", "14", "dd14")
 	n14.Snapshot = true
-	w14, err14 := db.StoreContextFile(n14)
+	w14, err14 := db.StoreContextFile(n14, 10)
 	if err14 != nil || !(w14.Depth == 0 && w14.Head && w14.Leaf) {
 		t.Error()
 	}
@@ -507,7 +507,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	n15 := CreateTestContextFile("context", "15", "dd15").PushDep(n7.DataDepDig)
 	n15.Snapshot = true
-	w15, err15 := db.StoreContextFile(n15)
+	w15, err15 := db.StoreContextFile(n15, 10)
 	if err15 != nil || !(w15.Depth == 0 && w15.Head && !w15.Leaf && !w15.CoveredBySnapshot) {
 		t.Error()
 	}

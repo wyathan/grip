@@ -194,7 +194,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	}
 	//You are here
 	//Check file size
-	st, err2 := os.Stat(c.Path)
+	st, err2 := os.Stat(c.GetPath())
 	if err2 != nil {
 		return err2
 	}
@@ -203,7 +203,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) er
 	if err != nil {
 		return err
 	}
-	_, err = db.StoreContextFile(c)
+	_, err = db.StoreContextFile(c, GetFileSize(c.GetPath()))
 	if err != nil {
 		return err
 	}
