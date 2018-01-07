@@ -22,17 +22,19 @@ func TestContextFileWrap(t *testing.T) {
 		// http://localhost:6060/debug/pprof/goroutine?debug=2
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	//                 15
-	//                  |
+	//             17
+	//             |
+	//             16   15
+	//             |    |
 	//             10   7    12     11
 	//             |      \   /      |
 	//             9        6        8
 	//              \      / \      /
-	//                 4         5         13      14
+	//                 4         5         13      14(0,200)
 	//                 |          \       /
-	//                 3              2
+	//                 3(5,100)       2
 	//                                |
-	//                                1
+	//                                1(5,10)
 	db := NewTestDB()
 
 	n1 := CreateTestContextFile("context", "1", "dd1")
@@ -54,7 +56,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	n3 := CreateTestContextFile("context", "3", "dd3")
 	n3.Snapshot = true
-	w3, err3 := db.StoreContextFile(n3, 10)
+	w3, err3 := db.StoreContextFile(n3, 100)
 	if err3 != nil || !(w3.Depth == 0 && w3.Head && w3.Leaf) {
 		t.Error()
 	}
@@ -448,7 +450,7 @@ func TestContextFileWrap(t *testing.T) {
 
 	n14 := CreateTestContextFile("context", "14", "dd14")
 	n14.Snapshot = true
-	w14, err14 := db.StoreContextFile(n14, 10)
+	w14, err14 := db.StoreContextFile(n14, 200)
 	if err14 != nil || !(w14.Depth == 0 && w14.Head && w14.Leaf) {
 		t.Error()
 	}
@@ -567,4 +569,31 @@ func TestContextFileWrap(t *testing.T) {
 	if !(w1.Depth == 5 && !w1.Head && w1.Leaf && !w1.CoveredBySnapshot) {
 		t.Error()
 	}
+
+	n16 := CreateTestContextFile("context", "16", "dd16").PushDep(n10.DataDepDig)
+	w16, err16 := db.StoreContextFile(n16, 10)
+	if err16 != nil || !(w16.Depth == 0 && w16.Head && !w16.Leaf && !w16.CoveredBySnapshot) {
+		t.Error()
+	}
+
+	n17 := CreateTestContextFile("context", "17", "dd17").PushDep(n16.DataDepDig)
+	w17, err17 := db.StoreContextFile(n17, 10)
+	if err17 != nil || !(w17.Depth == 0 && w17.Head && !w17.Leaf && !w17.CoveredBySnapshot) {
+		t.Error()
+	}
+
+	slst := db.GetContextLeaves([]byte("context"), false, false)
+	if 3 != len(slst) {
+		t.Error()
+	}
+	if string(slst[0].ContextFile.Dig) != "3" {
+		t.Errorf("slst[0]: %s, size: %d, depth: %d", string(slst[0].ContextFile.Dig), slst[0].Size, slst[0].Depth)
+	}
+	if string(slst[1].ContextFile.Dig) != "1" {
+		t.Errorf("slst[1]: %s, size: %d, depth: %d", string(slst[1].ContextFile.Dig), slst[1].Size, slst[1].Depth)
+	}
+	if string(slst[2].ContextFile.Dig) != "14" {
+		t.Errorf("slst[2]: %s, size: %d, depth: %d", string(slst[2].ContextFile.Dig), slst[2].Size, slst[2].Depth)
+	}
+
 }

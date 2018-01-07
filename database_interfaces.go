@@ -13,6 +13,8 @@ type Accountdb interface {
 	IncrNumberContexts(a *gripdata.Account) error
 	IncrNumberNodes(a *gripdata.Account) error
 	CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error
+	FreeStorageUsed(a *gripdata.Account, fsize uint64) error
+	SetAccountMessage(a *gripdata.Account, msg string) error
 }
 
 //Nodedb used for storing/getting node data from db

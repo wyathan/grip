@@ -271,7 +271,7 @@ func mergeSortContextFileWrap(s []*gripdata.ContextFileWrap, cmp compareContextF
 func doMergeSortContextFileWrap(s0 []*gripdata.ContextFileWrap, s1 []*gripdata.ContextFileWrap, cmp compareContextFileWrap) [][]*gripdata.ContextFileWrap {
 	var r []*gripdata.ContextFileWrap
 	for len(s0) > 0 && len(s1) > 0 {
-		if cmp.Compare(s0[0], s1[0]) > 0 {
+		if cmp.Compare(s0[0], s1[0]) >= 0 {
 			r = append(r, s0[0])
 			s0 = s0[1:]
 		} else {

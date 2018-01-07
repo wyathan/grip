@@ -163,6 +163,7 @@ func TestContexts(t *testing.T) {
 
 	var f gripdata.ContextFile
 	f.Context = ctx.Dig
+	f.Snapshot = true
 	f.SetPath(MakeTempFile())
 	err = grip.NewContextFile(&f, dbs[1])
 	if err != nil {
