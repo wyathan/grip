@@ -6,8 +6,8 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
-func signAndStoreContextResponse(c *gripdata.ContextResponse, db NodeNetContextdb) error {
-	err := SignNodeSig(c, db)
+func signAndStoreContextResponse(c *gripdata.ContextResponse, db DB) error {
+	_, err := SignNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -18,7 +18,7 @@ func signAndStoreContextResponse(c *gripdata.ContextResponse, db NodeNetContextd
 	return nil
 }
 
-func validateAndSaveContextResponse(c *gripdata.ContextResponse, db NodeNetContextdb) (*gripdata.Context, error) {
+func validateAndSaveContextResponse(c *gripdata.ContextResponse, db DB) (*gripdata.Context, error) {
 	//Make sure there was a request
 	myn, _ := db.GetPrivateNodeData()
 	req := db.GetContextRequest(c.ContextDig, myn.ID)
@@ -37,7 +37,7 @@ func validateAndSaveContextResponse(c *gripdata.ContextResponse, db NodeNetConte
 }
 
 //NewContextResponse we have decided to participate in a context
-func NewContextResponse(c *gripdata.ContextResponse, db NodeNetContextdb) error {
+func NewContextResponse(c *gripdata.ContextResponse, db DB) error {
 	ctx, err := validateAndSaveContextResponse(c, db)
 	if err != nil {
 		return err

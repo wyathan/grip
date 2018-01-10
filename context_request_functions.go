@@ -24,7 +24,7 @@ func CheckNonEscalating(src *gripdata.ContextRequest, tgt *gripdata.ContextReque
 	return true
 }
 
-func canNonOwnerCreateContextRequest(myid []byte, c *gripdata.ContextRequest, ctx *gripdata.Context, db NodeNetContextdb) error {
+func canNonOwnerCreateContextRequest(myid []byte, c *gripdata.ContextRequest, ctx *gripdata.Context, db DB) error {
 	//See if we have permission to add others
 	myreq := db.GetContextRequest(ctx.Dig, myid)
 	myrsp := db.GetContextResponse(ctx.Dig, myid)
@@ -37,7 +37,7 @@ func canNonOwnerCreateContextRequest(myid []byte, c *gripdata.ContextRequest, ct
 	return nil
 }
 
-func canCreateContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) (*gripdata.Context, error) {
+func canCreateContextRequest(c *gripdata.ContextRequest, db DB) (*gripdata.Context, error) {
 	myn, _ := db.GetPrivateNodeData()
 	//Owner can do what he likes
 	ctx := db.GetContext(c.ContextDig)
@@ -55,7 +55,7 @@ func canCreateContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) (*
 	return ctx, nil
 }
 
-func validateNewContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) (*gripdata.Context, error) {
+func validateNewContextRequest(c *gripdata.ContextRequest, db DB) (*gripdata.Context, error) {
 	tid := db.GetNode(c.TargetNodeID)
 	if tid == nil {
 		return nil, errors.New("Unknown target node")
@@ -71,8 +71,8 @@ func validateNewContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) 
 	return ctx, nil
 }
 
-func signAndStoreContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) error {
-	err := SignNodeSig(c, db)
+func signAndStoreContextRequest(c *gripdata.ContextRequest, db DB) error {
+	_, err := SignNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func signAndStoreContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb)
 	return nil
 }
 
-func validateAndSaveContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) (*gripdata.Context, error) {
+func validateAndSaveContextRequest(c *gripdata.ContextRequest, db DB) (*gripdata.Context, error) {
 	ctx, err := validateNewContextRequest(c, db)
 	if err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func validateAndSaveContextRequest(c *gripdata.ContextRequest, db NodeNetContext
 	return ctx, nil
 }
 
-func sendToNewContextTarget(c *gripdata.ContextRequest, ctx *gripdata.Context, db NodeNetContextdb) error {
+func sendToNewContextTarget(c *gripdata.ContextRequest, ctx *gripdata.Context, db DB) error {
 	err := CreateNewSend(ctx, c.TargetNodeID, db)
 	if err != nil {
 		return errors.New("Failed to create send request")
@@ -107,7 +107,7 @@ func sendToNewContextTarget(c *gripdata.ContextRequest, ctx *gripdata.Context, d
 	return err
 }
 
-func sendRequestAndResponse(ct *gripdata.ContextRequest, target []byte, db NodeNetContextdb) error {
+func sendRequestAndResponse(ct *gripdata.ContextRequest, target []byte, db DB) error {
 	err := CreateNewSend(ct, target, db)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func sendRequestAndResponse(ct *gripdata.ContextRequest, target []byte, db NodeN
 	return nil
 }
 
-func reciprocateNewContextData(c *gripdata.ContextRequest, ct *gripdata.ContextRequest, db NodeNetContextdb) error {
+func reciprocateNewContextData(c *gripdata.ContextRequest, ct *gripdata.ContextRequest, db DB) error {
 	//Send the request and response to the new target node
 	err := sendRequestAndResponse(ct, c.TargetNodeID, db)
 	if err != nil {
@@ -137,7 +137,7 @@ func reciprocateNewContextData(c *gripdata.ContextRequest, ct *gripdata.ContextR
 	return nil
 }
 
-func sendNewContextRequestToOthers(c *gripdata.ContextRequest, ctx *gripdata.Context, db NodeNetContextdb) error {
+func sendNewContextRequestToOthers(c *gripdata.ContextRequest, ctx *gripdata.Context, db DB) error {
 	//Send to the creator
 	err := CreateNewSend(c, ctx.NodeID, db)
 	if err != nil {
@@ -156,7 +156,7 @@ func sendNewContextRequestToOthers(c *gripdata.ContextRequest, ctx *gripdata.Con
 
 //NewContextRequest request a new node participate in
 //a context
-func NewContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) error {
+func NewContextRequest(c *gripdata.ContextRequest, db DB) error {
 	ctx, err := validateAndSaveContextRequest(c, db)
 	if err != nil {
 		return err
@@ -174,7 +174,7 @@ func NewContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) error {
 
 //SendToAllContextRequests sends data to all nodes that have a valid request for
 //a context
-func SendToAllContextRequests(c gripcrypto.SignInf, cid []byte, db NodeNetContextdb) error {
+func SendToAllContextRequests(c gripcrypto.SignInf, cid []byte, db DB) error {
 	//Send to all with requests
 	clr := db.GetContextRequests(cid)
 	for _, ct := range clr {

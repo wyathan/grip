@@ -13,67 +13,85 @@ import (
 
 	"github.com/wyathan/grip/gripcrypto"
 	"github.com/wyathan/grip/gripdata"
+	"github.com/wyathan/grip/griperrors"
 )
 
-func ListShareWithMe() []gripdata.ShareNodeInfo {
-	return nil
+type SNProc func(s *gripdata.ShareNodeInfo, db DB) (bool, error)
+
+func ShareNodeProc(np SNProc) SProc {
+	return func(s gripcrypto.SignInf, db DB) (bool, error) {
+		switch n := s.(type) {
+		case *gripdata.ShareNodeInfo:
+			return np(n, db)
+		}
+		return false, griperrors.NotShareNode
+	}
+}
+
+type UKProc func(s *gripdata.UseShareNodeKey, db DB) (bool, error)
+
+func UseKeyProc(np UKProc) SProc {
+	return func(s gripcrypto.SignInf, db DB) (bool, error) {
+		switch n := s.(type) {
+		case *gripdata.UseShareNodeKey:
+			return np(n, db)
+		}
+		return false, griperrors.NotShareNode
+	}
+}
+
+func StoreShareNodeInfo(v *gripdata.ShareNodeInfo, db DB) (bool, error) {
+	return true, db.StoreShareNodeInfo(v)
+}
+
+func SendAllShareNodeInfo(v *gripdata.ShareNodeInfo, db DB) (bool, error) {
+	return true, SendAllSharesToNew(v.NodeID, v.TargetNodeID, db)
 }
 
 //NewShareNode states that this node's Node data should be
 //shared with another node
-func NewShareNode(n *gripdata.ShareNodeInfo, db NodeNetAccountdb) error {
+func NewShareNode(n *gripdata.ShareNodeInfo, db DB) error {
 	myn, mypr := db.GetPrivateNodeData()
 	id := myn.ID
 	n.SetNodeID(id)
 
-	//See if the target node already has an account
 	createAutoAccount(mypr, n.TargetNodeID, db)
+	var v SProcChain
+	v.Push(SignNodeSig)
+	v.Push(ShareNodeProc(StoreShareNodeInfo))
+	v.PushV(SendAllToShareWithMe, myn)
+	v.Push(SendAllToShareWithMe)
+	v.Push(ShareNodeProc(SendAllShareNodeInfo))
 
-	err := SignNodeSig(n, db)
-	if err != nil {
-		return err
-	}
-	err = db.StoreShareNodeInfo(n)
-	if err != nil {
-		return err
-	}
-	err = SendAllToShareWithMe(myn, db)
-	if err != nil {
-		return err
-	}
-	err = SendAllToShareWithMe(n, db)
-	if err != nil {
-		return err
-	}
-	err = SendAllSharesToNew(id, n.TargetNodeID, db)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := v.F(n, db)
+	return err
+}
+
+func StoreUseShareNodeKey(v *gripdata.UseShareNodeKey, db DB) (bool, error) {
+	return true, db.StoreUseShareNodeKey(v)
+}
+
+func SendAllUseShareNodeKey(v *gripdata.UseShareNodeKey, db DB) (bool, error) {
+	return true, CreateNewSend(v, v.TargetID, db)
 }
 
 //NewUseShareNodeKey states that this node's Node data should be
 //shared with another node
-func NewUseShareNodeKey(n *gripdata.UseShareNodeKey, db NodeNetdb) error {
+func NewUseShareNodeKey(n *gripdata.UseShareNodeKey, db DB) error {
 	myn, _ := db.GetPrivateNodeData()
 	id := myn.ID
 	n.SetNodeID(id)
 	if n.Key == "" {
-		return errors.New("Key cannot be empty")
+		return griperrors.ShareNodeKeyEmpty
 	}
-	err := SignNodeSig(n, db)
-	if err != nil {
-		return err
-	}
-	err = db.StoreUseShareNodeKey(n)
-	if err != nil {
-		return err
-	}
-	err = CreateNewSend(n, n.TargetID, db)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	var v SProcChain
+	v.Push(SignNodeSig)
+	v.Push(UseKeyProc(StoreUseShareNodeKey))
+	v.Push(UseKeyProc(SendAllUseShareNodeKey))
+
+	_, err := v.F(n, db)
+	return err
 }
 
 func createAutoAccount(mypr *gripdata.MyNodePrivateData, target []byte, db Accountdb) {
@@ -107,21 +125,9 @@ func createAutoAccount(mypr *gripdata.MyNodePrivateData, target []byte, db Accou
 	}
 }
 
-//SendAllToAllKey sends new data to all nodes on share list
-func SendAllToAllKey(s gripcrypto.SignInf, k string, db NodeNetdb) error {
-	shl := FindAllToShareWithFromKey(k, db)
-	for _, sh := range shl {
-		err := CreateNewSend(s, sh, db)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 //FindAllToShareWithFromKey get all the nodes that we should send
 //new data to based on a key.
-func FindAllToShareWithFromKey(k string, db NodeNetdb) [][]byte {
+func FindAllToShareWithFromKey(k string, db DB) [][]byte {
 	var s [][]byte
 	kl := db.ListShareNodeKey(k)
 	for _, sn := range kl {
@@ -134,7 +140,7 @@ func FindAllToShareWithFromKey(k string, db NodeNetdb) [][]byte {
 //FindAllToShareWith get the targets ids from all the ShareNodeInfo's
 //created by id.  Get all the node ids that have created UseShareNodeKey
 //that match any of the keys from the ShareNodeInfo created by id.
-func FindAllToShareWith(id []byte, db NodeNetdb) [][]byte {
+func FindAllToShareWith(id []byte, db DB) [][]byte {
 	sl := db.ListShareNodeInfo(id)
 	km := make(map[string]bool)
 	bm := make(map[string][]byte)
@@ -159,7 +165,7 @@ func FindAllToShareWith(id []byte, db NodeNetdb) [][]byte {
 }
 
 //SendAllSharesToNew sends all data to a new share node
-func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
+func SendAllSharesToNew(from []byte, to []byte, db DB) error {
 	shl := db.ListShareNodeInfo(from)
 	km := make(map[string]bool)
 	for _, sr := range shl {
@@ -205,32 +211,20 @@ func SendAllSharesToNew(from []byte, to []byte, db NodeNetdb) error {
 	return nil
 }
 
-//SendAllToShareWith sends new data to all nodes on share list
-func SendAllToShareWith(s gripcrypto.SignInf, sourceid []byte, db NodeNetdb) error {
-	shl := FindAllToShareWith(sourceid, db)
-	for _, sh := range shl {
-		err := CreateNewSend(s, sh, db)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 //SendAllToShareWithMe sends new data to all nodes the source has shared with
-func SendAllToShareWithMe(s gripcrypto.SignInf, db NodeNetdb) error {
+func SendAllToShareWithMe(s gripcrypto.SignInf, db DB) (bool, error) {
 	shl := FindAllToShareWith(s.GetNodeID(), db)
 	for _, sh := range shl {
 		err := CreateNewSend(s, sh, db)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 //CreateNewSend indicates this data should be sent to this node
-func CreateNewSend(v gripcrypto.SignInf, sendto []byte, db NodeNetdb) error {
+func CreateNewSend(v gripcrypto.SignInf, sendto []byte, db DB) error {
 	me, _ := db.GetPrivateNodeData()
 	if bytes.Equal(sendto, me.ID) {
 		return nil
@@ -275,11 +269,11 @@ func CreateNewNode(pr *gripdata.MyNodePrivateData, n *gripdata.Node, db Nodedb) 
 
 //AssociateNodeAccoutKey associates this node with an account
 //on another node
-func AssociateNodeAccoutKey(key string, tnid []byte, db NodeNetdb) error {
+func AssociateNodeAccoutKey(key string, tnid []byte, db DB) error {
 	var nac gripdata.AssociateNodeAccountKey
 	nac.Key = key
 	nac.TargetNodeID = tnid
-	err := SignNodeSig(&nac, db)
+	_, err := SignNodeSig(&nac, db)
 	if err != nil {
 		return err
 	}
@@ -292,28 +286,28 @@ func AssociateNodeAccoutKey(key string, tnid []byte, db NodeNetdb) error {
 }
 
 //SignNodeSig sign a new sign interface
-func SignNodeSig(s gripcrypto.SignInf, db Nodedb) error {
-	_, privdata := db.GetPrivateNodeData()
+func SignNodeSig(s gripcrypto.SignInf, db DB) (bool, error) {
+	_, privdata := (Nodedb(db)).GetPrivateNodeData()
 	s.SetNodeID(privdata.ID)
 	err := gripcrypto.Sign(s, privdata.PrivateKey)
 	if err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return true, nil
 }
 
 //VerifyNodeSig verify a node signed a sign interface
-func VerifyNodeSig(s gripcrypto.SignInf, db Nodedb) error {
+func VerifyNodeSig(s gripcrypto.SignInf, db DB) (bool, error) {
 	nodeid := s.GetNodeID()
 	if nodeid == nil {
-		return errors.New("NodeID was not set")
+		return false, errors.New("NodeID was not set")
 	}
 	nodedata := db.GetNode(nodeid)
 	if nodedata == nil {
-		return errors.New("Node was not found in db")
+		return false, errors.New("Node was not found in db")
 	}
 	if !gripcrypto.Verify(s, nodedata.PublicKey) {
-		return errors.New("Signature was not valid")
+		return false, errors.New("Signature was not valid")
 	}
-	return nil
+	return true, nil
 }

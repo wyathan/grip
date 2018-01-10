@@ -10,13 +10,13 @@ import (
 )
 
 //IncomingContext process a new incoming network
-func IncomingContext(c *gripdata.Context, db NodeNetAccountContextdb) error {
+func IncomingContext(c *gripdata.Context, db DB) error {
 	_, pr := db.GetPrivateNodeData()
 	if bytes.Equal(pr.ID, c.NodeID) {
 		//I created this.  Ignore it
 		return nil
 	}
-	err := VerifyNodeSig(c, db)
+	_, err := VerifyNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -28,14 +28,14 @@ func IncomingContext(c *gripdata.Context, db NodeNetAccountContextdb) error {
 }
 
 //IncomingContextRequest process new incoming ContextRequest
-func IncomingContextRequest(c *gripdata.ContextRequest, db NodeNetAccountContextdb) error {
+func IncomingContextRequest(c *gripdata.ContextRequest, db DB) error {
 	//Check account is valide
 	_, pr := db.GetPrivateNodeData()
 	if bytes.Equal(pr.ID, c.NodeID) {
 		//I created this.  Ignore it
 		return nil
 	}
-	err := VerifyNodeSig(c, db)
+	_, err := VerifyNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -133,13 +133,13 @@ func IncomingContextRequest(c *gripdata.ContextRequest, db NodeNetAccountContext
 //on requests, so we can just accept all responses.  Note we don't check for the request
 //first just in case we get them out of order.  However, to participate in the context
 //a valid request must match the response.
-func IncomingContextResponse(c *gripdata.ContextResponse, db NodeNetAccountContextdb) error {
+func IncomingContextResponse(c *gripdata.ContextResponse, db DB) error {
 	_, pr := db.GetPrivateNodeData()
 	if bytes.Equal(pr.ID, c.TargetNodeID) {
 		//I created this.  Ignore it
 		return nil
 	}
-	err := VerifyNodeSig(c, db)
+	_, err := VerifyNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -167,14 +167,14 @@ func IncomingContextResponse(c *gripdata.ContextResponse, db NodeNetAccountConte
 
 //IncomingContextFile process an incoming context file.  Check permission and forward
 //to participating nodes
-func IncomingContextFile(c *gripdata.ContextFile, db NodeNetAccountContextdb) error {
+func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 	_, pr := db.GetPrivateNodeData()
 	if bytes.Equal(pr.ID, c.NodeID) {
 		//I created this.  Ignore it
 		return nil
 	}
 	//Check the signature of the context file
-	err := VerifyNodeSig(c, db)
+	_, err := VerifyNodeSig(c, db)
 	if err != nil {
 		return err
 	}

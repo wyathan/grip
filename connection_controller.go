@@ -18,7 +18,7 @@ type ConnectionController struct {
 	SendChan      chan interface{}
 	Done          bool
 	Incoming      bool
-	DB            NodeNetAccountContextdb
+	DB            DB
 	SocketCtrl    *SocketController
 	Pending       cmap.ConcurrentMap
 	ConID         uint64

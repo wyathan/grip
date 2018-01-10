@@ -16,13 +16,13 @@ type SocketController struct {
 	Connections map[string]*ConnectionController
 	S           Socket
 	Done        bool
-	DB          NodeNetAccountContextdb
+	DB          DB
 	LastLoop    uint64
 }
 
 //NewSocketController builds a new SocketController to handle
 //incoming connections
-func NewSocketController(sock Socket, db NodeNetAccountContextdb) *SocketController {
+func NewSocketController(sock Socket, db DB) *SocketController {
 	var s SocketController
 	s.S = sock
 	s.DB = db

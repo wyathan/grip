@@ -10,7 +10,7 @@ import (
 	"github.com/wyathan/grip/gripdata"
 )
 
-func doesContextFielHaveLoop(head []byte, dep *gripdata.ContextFileWrap, db NodeNetContextdb) bool {
+func doesContextFielHaveLoop(head []byte, dep *gripdata.ContextFileWrap, db DB) bool {
 	for _, dr := range dep.ContextFile.DependsOn {
 		if isThereDepLoop(head, dr, db) {
 			return true
@@ -21,7 +21,7 @@ func doesContextFielHaveLoop(head []byte, dep *gripdata.ContextFileWrap, db Node
 
 //isThereDepLoop returns true if a dependency loop is found.
 //It would be very impressive, but equally nasty if it occurs
-func isThereDepLoop(head []byte, check []byte, db NodeNetContextdb) bool {
+func isThereDepLoop(head []byte, check []byte, db DB) bool {
 	if bytes.Equal(head, check) {
 		return true
 	}
@@ -45,7 +45,7 @@ func isDupInDeps(depdigs [][]byte, idx int) bool {
 	return false
 }
 
-func areDepsSane(depdig []byte, chkdig []byte, db NodeNetContextdb) bool {
+func areDepsSane(depdig []byte, chkdig []byte, db DB) bool {
 	//Check that the digest of dependencies and the file don't produce the
 	//same value was one of the dependencies.  That would be very impressive!
 	if bytes.Equal(depdig, chkdig) {
@@ -62,7 +62,7 @@ func areDepsSane(depdig []byte, chkdig []byte, db NodeNetContextdb) bool {
 
 //IsContextFileDepsOk returns true if the depenencies
 //are ok and won't cause problems
-func IsContextFileDepsOk(c *gripdata.ContextFile, db NodeNetContextdb) (r bool) {
+func IsContextFileDepsOk(c *gripdata.ContextFile, db DB) (r bool) {
 	defer func() {
 		if !r && c != nil {
 			db.StoreVeryBadContextFile(c)
@@ -81,7 +81,7 @@ func IsContextFileDepsOk(c *gripdata.ContextFile, db NodeNetContextdb) (r bool) 
 	return true
 }
 
-func filterContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) *gripdata.ContextRequest {
+func filterContextRequest(c *gripdata.ContextRequest, db DB) *gripdata.ContextRequest {
 	if c == nil {
 		return nil
 	}
@@ -98,7 +98,7 @@ func filterContextRequest(c *gripdata.ContextRequest, db NodeNetContextdb) *grip
 }
 
 //IsIfValidContextSource check if nid or the
-func IsIfValidContextSource(nid []byte, ctx *gripdata.Context, db NodeNetContextdb) bool {
+func IsIfValidContextSource(nid []byte, ctx *gripdata.Context, db DB) bool {
 	if ctx == nil {
 		return false
 	}
@@ -113,7 +113,7 @@ func IsIfValidContextSource(nid []byte, ctx *gripdata.Context, db NodeNetContext
 	return rq != nil && rq.AllowContextSource
 }
 
-func sendToContextParticipant(c gripcrypto.SignInf, ct *gripdata.ContextRequest, db NodeNetContextdb) error {
+func sendToContextParticipant(c gripcrypto.SignInf, ct *gripdata.ContextRequest, db DB) error {
 	fr := filterContextRequest(ct, db)
 	if fr != nil {
 		err := CreateNewSend(c, ct.TargetNodeID, db)
@@ -124,7 +124,7 @@ func sendToContextParticipant(c gripcrypto.SignInf, ct *gripdata.ContextRequest,
 	return nil
 }
 
-func findAndSendToContextParticipants(c gripcrypto.SignInf, ctxid []byte, db NodeNetContextdb) error {
+func findAndSendToContextParticipants(c gripcrypto.SignInf, ctxid []byte, db DB) error {
 	clr := db.GetContextRequests(ctxid)
 	for _, ct := range clr {
 		err := sendToContextParticipant(c, ct, db)
@@ -136,7 +136,7 @@ func findAndSendToContextParticipants(c gripcrypto.SignInf, ctxid []byte, db Nod
 }
 
 //SendToAllContextParticipants Send context data to all participants
-func SendToAllContextParticipants(c gripcrypto.SignInf, ctxid []byte, db NodeNetContextdb) error {
+func SendToAllContextParticipants(c gripcrypto.SignInf, ctxid []byte, db DB) error {
 	//Send to the context owner
 	ctx := db.GetContext(ctxid)
 	if ctx == nil {
@@ -165,7 +165,7 @@ func validateFile(c *gripdata.ContextFile) error {
 	return nil
 }
 
-func isAllowedToCreateFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
+func isAllowedToCreateFile(c *gripdata.ContextFile, db DB) error {
 	myn, _ := db.GetPrivateNodeData()
 	ctx := db.GetContext(c.Context)
 	if ctx == nil {
@@ -177,9 +177,9 @@ func isAllowedToCreateFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
 	return nil
 }
 
-func validateContextFileDepsAndSign(c *gripdata.ContextFile, db NodeNetContextdb) error {
+func validateContextFileDepsAndSign(c *gripdata.ContextFile, db DB) error {
 	//Go ahead and sign so that we have valid digests
-	err := SignNodeSig(c, db)
+	_, err := SignNodeSig(c, db)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func validateContextFileDepsAndSign(c *gripdata.ContextFile, db NodeNetContextdb
 	return nil
 }
 
-func validateAndSignContextFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
+func validateAndSignContextFile(c *gripdata.ContextFile, db DB) error {
 	err := validateFile(c)
 	if err != nil {
 		return err
@@ -215,7 +215,7 @@ func GetFileSize(p string) int64 {
 }
 
 //NewContextFile add a new file for a context
-func NewContextFile(c *gripdata.ContextFile, db NodeNetContextdb) error {
+func NewContextFile(c *gripdata.ContextFile, db DB) error {
 	err := validateAndSignContextFile(c, db)
 	if err != nil {
 		return err

@@ -86,7 +86,7 @@ func (t *TestDB) CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error
 	t.Accounts[a.AccountID] = a
 	return nil
 }
-func (t *TestDB) FreeStorageUsed(a *gripdata.Account, fsize uint64) error {
+func (t *TestDB) FreeStorageUsed(a *gripdata.Account, fsize uint64) (*gripdata.Account, error) {
 	t.Lock()
 	defer t.Unlock()
 	a = t.Accounts[a.AccountID]
@@ -96,7 +96,7 @@ func (t *TestDB) FreeStorageUsed(a *gripdata.Account, fsize uint64) error {
 		a.DiskSpaceUsed = 0
 	}
 	t.Accounts[a.AccountID] = a
-	return nil
+	return a, nil
 }
 func (t *TestDB) SetAccountMessage(a *gripdata.Account, msg string) error {
 	t.Lock()

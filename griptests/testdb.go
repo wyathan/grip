@@ -70,7 +70,7 @@ func (t *TestDB) addDig(s gripcrypto.SignInf) {
 //testTestDBImplements make sure we implement the interfaces
 func testTestDBImplements() {
 	var t TestDB
-	var s grip.NodeNetAccountContextdb
+	var s grip.DB
 	s = &t
 	s.GetAccount("")
 }

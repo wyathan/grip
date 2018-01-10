@@ -28,3 +28,7 @@ type Account struct {
 	NumberContexts uint32 //Current number of contexts created by this account
 	DiskSpaceUsed  uint64 //Current disk space used
 }
+
+func (a *Account) Free() uint64 {
+	return a.MaxDiskSpace - a.DiskSpaceUsed
+}

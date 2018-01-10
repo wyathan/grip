@@ -13,7 +13,7 @@ type Accountdb interface {
 	IncrNumberContexts(a *gripdata.Account) error
 	IncrNumberNodes(a *gripdata.Account) error
 	CheckUpdateStorageUsed(a *gripdata.Account, fsize uint64) error
-	FreeStorageUsed(a *gripdata.Account, fsize uint64) error
+	FreeStorageUsed(a *gripdata.Account, fsize uint64) (*gripdata.Account, error)
 	SetAccountMessage(a *gripdata.Account, msg string) error
 }
 
@@ -97,13 +97,6 @@ type NodeNetContextdb interface {
 	Contextdb
 }
 
-type NodeNetAccountContextdb interface {
-	Nodedb
-	Netdb
-	Contextdb
-	Accountdb
-}
-
 //NodeAccountdb implements both Nodedb and Accountdb
 type NodeAccountdb interface {
 	Nodedb
@@ -120,5 +113,13 @@ type NodeNetdb interface {
 type NodeNetAccountdb interface {
 	Nodedb
 	Netdb
+	Accountdb
+}
+
+//DB implements all database interfaces
+type DB interface {
+	Nodedb
+	Netdb
+	Contextdb
 	Accountdb
 }
