@@ -5,7 +5,6 @@ import (
 	"crypto/sha512"
 	"errors"
 	"log"
-	"time"
 
 	"github.com/wyathan/grip/gripcrypto"
 	"github.com/wyathan/grip/gripdata"
@@ -20,7 +19,7 @@ func NodeProc(np NProc) SProc {
 		case *gripdata.Node:
 			return np(n, db)
 		}
-		return false, griperrors.NotNode
+		return false, griperrors.WrongType
 	}
 }
 
@@ -75,23 +74,6 @@ func ShareWithMe(s *gripdata.ShareNodeInfo, db DB) (bool, error) {
 	_, pr := db.GetPrivateNodeData()
 	if bytes.Equal(pr.ID, s.TargetNodeID) {
 		log.Println("Sharing node data with me")
-		//Yippy skippy.  They want to share their data with me
-		//Do we want to auto-reciprocate?
-		//NOTE: This is dangerous.  A public node should
-		//Never have this on or anyone could connect share their
-		//info and get information about all other nodes.
-		//It is also broken in that we can get into a loop
-		//between two nodes that both have this on
-		//if pr.AutoShareNodeInfo {
-		//	log.Println("Autoshare is enabled")
-		//	var ns gripdata.ShareNodeInfo
-		//	ns.TargetNodeID = s.NodeID
-		//	ns.MetaData = pr.AutoShareMetaData
-		//	err := NewShareNode(&ns, db)
-		//	if err != nil {
-		//		log.Printf("Failed to create autoshare: %s\n", err)
-		//	}
-		//}
 		return false, nil
 	}
 	return true, nil
@@ -231,49 +213,4 @@ func IsIDAccountEnabled(id []byte, db Accountdb) bool {
 //IsAccountEnabled see if this signInf has account enabled
 func IsAccountEnabled(s gripcrypto.SignInf, db Accountdb) bool {
 	return IsIDAccountEnabled(s.GetNodeID(), db)
-}
-
-//IncomingNodeAccountKey process incoming ShareNodeInfoKeys
-func IncomingNodeAccountKey(s *gripdata.AssociateNodeAccountKey, db DB) error {
-	_, err := VerifyNodeSig(s, db)
-	if err != nil {
-		return err
-	}
-	ak := db.GetNodeAccountKey(s.Key)
-	if ak == nil {
-		return errors.New("Node account key not found")
-	}
-	if ak.Used {
-		return errors.New("Onetime node account key has been used")
-	}
-	nw := uint64(time.Now().UnixNano())
-	if nw > ak.Expiration {
-		return errors.New("Node account key has expired")
-	}
-	a := db.GetAccount(ak.AccountID)
-	if a == nil {
-		return errors.New("Account could not be found")
-	}
-	if !a.Enabled {
-		return errors.New("Account is not enabled")
-	}
-	if !a.AllowNodeAcocuntKey {
-		return errors.New("Account does not allow node account keys")
-	}
-	if a.NumberNodes >= a.MaxNodes {
-		return errors.New("Maximum number of nodes for account reached")
-	}
-	err = db.IncrNumberNodes(a)
-	if err != nil {
-		return err
-	}
-	var na gripdata.NodeAccount
-	na.AccountID = a.AccountID
-	na.Enabled = true
-	na.NodeID = s.NodeID
-	err = db.StoreNodeAccount(&na)
-	if err != nil {
-		return err
-	}
-	return nil
 }

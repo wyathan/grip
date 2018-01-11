@@ -24,7 +24,7 @@ func ShareNodeProc(np SNProc) SProc {
 		case *gripdata.ShareNodeInfo:
 			return np(n, db)
 		}
-		return false, griperrors.NotShareNode
+		return false, griperrors.WrongType
 	}
 }
 
@@ -36,7 +36,7 @@ func UseKeyProc(np UKProc) SProc {
 		case *gripdata.UseShareNodeKey:
 			return np(n, db)
 		}
-		return false, griperrors.NotShareNode
+		return false, griperrors.WrongType
 	}
 }
 
@@ -164,6 +164,33 @@ func FindAllToShareWith(id []byte, db DB) [][]byte {
 	return s
 }
 
+func SendStuffTo(to []byte, db DB, s ...gripcrypto.SignInf) error {
+	for _, e := range s {
+		if e != nil {
+			err := CreateNewSend(e, to, db)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func SendToKeyMap(km map[string]bool, to []byte, db DB) error {
+	for k := range km {
+		//Find all nodes that used key
+		skl := db.ListUseShareNodeKey(k)
+		for _, sk := range skl {
+			nd := db.GetNode(sk.NodeID)
+			err := SendStuffTo(to, db, nd, &sk)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 //SendAllSharesToNew sends all data to a new share node
 func SendAllSharesToNew(from []byte, to []byte, db DB) error {
 	shl := db.ListShareNodeInfo(from)
@@ -172,43 +199,15 @@ func SendAllSharesToNew(from []byte, to []byte, db DB) error {
 		n := db.GetNode(sr.NodeID)
 		nd := db.GetNode(sr.TargetNodeID)
 		log.Printf("Sending sharenodeinfo not nil: source node %t, target %t", (nd != nil), (n != nil))
-		if nd != nil && n != nil {
-			//FIXME: You'll send the same node data more than once. :/
-			//Although after the first is sent it should remove all matcing
-			//SendData from the db
-			err := CreateNewSend(n, to, db)
-			if err != nil {
-				return err
-			}
-			err = CreateNewSend(nd, to, db)
-			if err != nil {
-				return err
-			}
-			err = CreateNewSend(&sr, to, db)
-			if err != nil {
-				return err
-			}
-			if sr.Key != "" {
-				km[sr.Key] = true
-			}
+		err := SendStuffTo(to, db, n, nd, &sr)
+		if err != nil {
+			return err
+		}
+		if sr.Key != "" {
+			km[sr.Key] = true
 		}
 	}
-	for k := range km {
-		//Find all nodes that used key
-		skl := db.ListUseShareNodeKey(k)
-		for _, sk := range skl {
-			nd := db.GetNode(sk.NodeID)
-			err := CreateNewSend(nd, to, db)
-			if err != nil {
-				return err
-			}
-			err = CreateNewSend(&sk, to, db)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return SendToKeyMap(km, to, db)
 }
 
 //SendAllToShareWithMe sends new data to all nodes the source has shared with

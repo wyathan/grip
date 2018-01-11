@@ -9,10 +9,15 @@ const (
 )
 
 var ShareNodeKeyEmpty error = GErr(2).Msg(EnUs, "Key cannot be empty")
-var NotNode error = GErr(3).Msg(EnUs, "Not a node")
-var NotShareNode error = GErr(4).Msg(EnUs, "Not ShareNodeInfo")
+var WrongType error = GErr(3).Msg(EnUs, "Wrong type")
 var TargetNodeNil error = GErr(5).Msg(EnUs, "Target node id cannot be nil")
 var AccountNotEnabled error = GErr(6).Msg(EnUs, "Node account is not enabled")
+var NodeAccountKeyNotFound error = GErr(7).Msg(EnUs, "Node account key not found")
+var NodeAccountKeyUsed error = GErr(8).Msg(EnUs, "Onetime node account key has been used")
+var NodeAccountKeyExpired error = GErr(9).Msg(EnUs, "Node account key has expired")
+var AccountNotFound error = GErr(10).Msg(EnUs, "Account could not be found")
+var AccountKeyNotAllowed error = GErr(11).Msg(EnUs, "Account does not allow node account keys")
+var MaxNodesForAccount error = GErr(12).Msg(EnUs, "Maximum number of nodes for account reached")
 
 func GErr(code int) *Griperr {
 	var g Griperr
