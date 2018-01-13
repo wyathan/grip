@@ -18,6 +18,8 @@ var NodeAccountKeyExpired error = GErr(9).Msg(EnUs, "Node account key has expire
 var AccountNotFound error = GErr(10).Msg(EnUs, "Account could not be found")
 var AccountKeyNotAllowed error = GErr(11).Msg(EnUs, "Account does not allow node account keys")
 var MaxNodesForAccount error = GErr(12).Msg(EnUs, "Maximum number of nodes for account reached")
+var NotContextSource error = GErr(13).Msg(EnUs, "You don't have permission to add files to context")
+var DependencyProblems error = GErr(14).Msg(EnUs, "Context file dependency problems found")
 
 func GErr(code int) *Griperr {
 	var g Griperr

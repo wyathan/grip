@@ -1,1 +1,10 @@
 None
+- Check accounts for locally created ContextFiles
+- Review if we need to check accounts for creating contexts
+    - Remote log-ins are for contexts only, so they would already
+      need to be created
+- Add file transfers
+    - Create file transfers for all new accepting ContextResponses
+    - Add connection to connection file transfer (bonus)
+- Test context file caching 
+- Test file transfers 

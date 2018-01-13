@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/wyathan/grip/gripdata"
+	"github.com/wyathan/grip/griperrors"
 )
 
 //IncomingContext process a new incoming network
@@ -182,15 +183,15 @@ func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 	if !IsIfValidContextSource(c.NodeID, ctx, db) {
 		db.StoreVeryBadContextFile(c)
 		log.Printf("Incoming ContextFile without permission: %s", c.Dig)
-		return errors.New("Not valid source node ")
+		return griperrors.NotContextSource
 	}
 	if !IsContextFileDepsOk(c, db) {
-		return errors.New("Dependency problems were found")
+		return griperrors.DependencyProblems
 	}
 	//Get the account for the creating node.
 	a := GetNodeAccount(c.NodeID, db)
 	if !((bytes.Equal(ctx.NodeID, c.NodeID) || a.AllowContextSource) && a.Enabled) {
-		return errors.New("Account does not allow context source")
+		return griperrors.NotContextSource
 	}
 	//You are here
 	//Check file size
@@ -198,12 +199,18 @@ func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 	if err2 != nil {
 		return err2
 	}
-	//Check max file storage
-	err = db.CheckUpdateStorageUsed(a, uint64(st.Size()))
+	size := uint64(st.Size())
+	//Free storage if needed
+	err = FreeSpace(ctx, size, db)
 	if err != nil {
 		return err
 	}
-	_, err = db.StoreContextFile(c, GetFileSize(c.GetPath()))
+	//Check max file storage
+	err = db.CheckUpdateStorageUsed(a, size)
+	if err != nil {
+		return err
+	}
+	_, err = db.StoreContextFile(c, int64(size))
 	if err != nil {
 		return err
 	}

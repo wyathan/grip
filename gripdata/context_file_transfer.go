@@ -20,8 +20,6 @@ type ContextFileTransfer struct {
 
 	NodeID []byte //Node ID of creating node, just needed to validate sig
 	Sig    []byte //Signed by NodeID private key
-
-	Path string //Transient path to local file
 }
 
 //Digest ContextFileTransfer

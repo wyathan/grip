@@ -257,6 +257,9 @@ type compareContextFileWrap interface {
 
 //Using merge sort because it's stable so we can sort size the depth
 func mergeSortContextFileWrap(s []*gripdata.ContextFileWrap, cmp compareContextFileWrap) []*gripdata.ContextFileWrap {
+	if len(s) <= 0 {
+		return s
+	}
 	var mr [][]*gripdata.ContextFileWrap
 	for c := 0; c < len(s); c++ {
 		mr = append(mr, s[c:c+1])
