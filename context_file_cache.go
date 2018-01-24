@@ -13,12 +13,10 @@ func deleteCoveredSnapshots(a *gripdata.Account, c *gripdata.Context, fsize uint
 	cs := db.GetCoveredSnapshots(c.Dig)
 	var err error
 	for c := 0; c < len(cs) && fsize > a.Free(); c++ {
-		if cs[c].Size > 0 {
-			a, err = deleteContextFileWrap(cs[c], a, db)
-			if err != nil {
-				log.Printf("Could not delete covered snapshots: %s", err)
-				return err
-			}
+		a, err = deleteContextFileWrap(cs[c], a, db)
+		if err != nil {
+			log.Printf("Could not delete covered snapshots: %s", err)
+			return err
 		}
 	}
 	return nil
@@ -29,13 +27,11 @@ func deleteHistory(a *gripdata.Account, c *gripdata.Context, fsize uint64, cvr b
 	var err error
 	cs := db.GetContextLeaves(c.Dig, cvr, idx)
 	for c := 0; c < len(cs) && fsize > a.Free(); c++ {
-		if cs[c].Size > 0 {
-			a, err = deleteContextFileWrap(cs[c], a, db)
-			if err != nil {
-				return false, err
-			}
-			loopmore = true
+		a, err = deleteContextFileWrap(cs[c], a, db)
+		if err != nil {
+			return false, err
 		}
+		loopmore = true
 	}
 	return loopmore, nil
 }
@@ -67,12 +63,10 @@ func deleteNonCoveredHistory(a *gripdata.Account, c *gripdata.Context, fsize uin
 		loopmore = false
 		cs := db.GetContextLeaves(c.Dig, false, false)
 		for c := 0; c < len(cs) && fsize > a.Free(); c++ {
-			if cs[c].Size > 0 {
-				a, err = deleteContextFileWrap(cs[c], a, db)
-				loopmore = true
-				if err != nil {
-					return err
-				}
+			a, err = deleteContextFileWrap(cs[c], a, db)
+			loopmore = true
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -118,7 +112,7 @@ func deleteContextFileWrap(c *gripdata.ContextFileWrap, a *gripdata.Account, db 
 	if err != nil {
 		return a, err
 	}
-	a, err = db.FreeStorageUsed(a, uint64(c.Size))
+	a, err = db.FreeStorageUsed(a, c.ContextFile.Size)
 	if err != nil {
 		log.Printf("Failed to free disk space for account, %s", err)
 		return a, err

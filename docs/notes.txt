@@ -1,10 +1,23 @@
-None
+
 - Check accounts for locally created ContextFiles
 - Review if we need to check accounts for creating contexts
     - Remote log-ins are for contexts only, so they would already
       need to be created
 - Add file transfers
     - Create file transfers for all new accepting ContextResponses
+        - If full repo create file transfers for all files.
+        - Otherwise we might be able to just send the top files down to the latest snapshot.
+            - Only a node with a full repo could do this though.
     - Add connection to connection file transfer (bonus)
 - Test context file caching 
 - Test file transfers 
+- Finish IncomingFileTransfer in file_transfer_network_functions.go
+
+- When saving ContextFileTransferWrap the database function should check for an existing
+    ContextFileWrap that matches and point the transfer to it.  This should be done as part
+    of the save transaction 
+- When saving ContextFile to database it should automatically add link to 
+    existing ContextFileTransferWraps that match
+    - When receiving incoming ContextFile check if matching DeletedContextFile exists
+        don't save it to the regular ContextFiles if so.
+    - Add to existing matching ContextFileTrasnfers 

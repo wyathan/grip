@@ -15,12 +15,11 @@ import (
 //ContextFiles
 type ContextFileWrap struct {
 	ContextFile       *ContextFile
-	Head              bool  //is this file at the head of a dep tree
-	Leaf              bool  //is this file at the leaf/tail of dep tree path
-	Depth             int   //how long is it from the head to this node
-	Size              int64 //size of the file
-	CoveredBySnapshot bool  //do all the dependencies of this file covered by snapshots
-	Unconstructable   bool  //Lost the ability to use locally due to deleting files
+	Head              bool //is this file at the head of a dep tree
+	Leaf              bool //is this file at the leaf/tail of dep tree path
+	Depth             int  //how long is it from the head to this node
+	CoveredBySnapshot bool //do all the dependencies of this file covered by snapshots
+	Unconstructable   bool //Lost the ability to use locally due to deleting files
 }
 
 //ContextFileWrapdb database interface that can only be called

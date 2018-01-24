@@ -18,6 +18,7 @@ type ContextFile struct {
 	DataDepDig  []byte //Digest of Index, Snapshot, DependsOn, Context, and the contents of Path
 	Dig         []byte //This record's digest
 	Sig         []byte //Signed by NodeID private key
+	Size        uint64 //Size of the file
 	//path is private
 	path string
 }
@@ -61,6 +62,7 @@ func (a *ContextFile) Digest() []byte {
 	}
 	gripcrypto.HashBytes(h, a.Context)
 	gripcrypto.HashFile(h, a.path)
+	gripcrypto.HashUint64(h, a.Size)
 	a.DataDepDig = h.Sum(nil)
 	h = sha512.New()
 	gripcrypto.HashBytes(h, a.DataDepDig)

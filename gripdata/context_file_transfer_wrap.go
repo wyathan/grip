@@ -4,7 +4,7 @@ package gripdata
 //keep local information needed
 type ContextFileTransferWrap struct {
 	ContextFileTransfer *ContextFileTransfer
+	ContextFile         *ContextFile
 	Size                int64
-	Path                string
 	RetreivedOn         int64
 }

@@ -34,7 +34,7 @@ func (ctrl *ConnectionController) sendData(r interface{}) (int, error) {
 	switch v := r.(type) {
 	case SendDig:
 		if v.HaveIt {
-			ctrl.deleteSendData(v.Dig)
+			ctrl.deleteSendDataOrFileTransfer(v.Dig)
 		} else {
 			err = ctrl.sendSendData(v.Dig)
 		}
@@ -114,7 +114,7 @@ func (ctrl *ConnectionController) readSwitch(d interface{}) (err error) {
 			log.Printf("Failed to process rejection! %s", err)
 		}
 	case AckDig:
-		err = ctrl.deleteSendData(v.Dig)
+		err = ctrl.deleteSendDataOrFileTransfer(v.Dig)
 		if err != nil {
 			log.Printf("Failed to delete SendData! %s", err)
 		}
@@ -142,6 +142,9 @@ func (ctrl *ConnectionController) readSwitch(d interface{}) (err error) {
 	case *gripdata.ContextFile:
 		err = IncomingContextFile(v, ctrl.DB)
 		ctrl.processSendError("ContextFile", v.Dig, err)
+	case *gripdata.ContextFileTransfer:
+		err = IncomingFileTransfer(v, ctrl.DB)
+		ctrl.processSendError("ContextFileTransfer", v.Dig, err)
 	}
 	return err
 }

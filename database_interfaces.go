@@ -38,7 +38,8 @@ type Netdb interface {
 	StoreRejectedSendData(s *gripdata.RejectedSendData) error
 	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
 	//                                                           WARNING! Must be sorted by Timestamp
-	DeleteSendData(d []byte, to []byte) error //Data has been setnt to the node
+	DeleteSendData(d []byte, to []byte) (bool, error) //Data has been setnt to the node, no error if missing
+	// return bool as true if successfully deleted, false if it didn't exist
 	GetDigestData(d []byte) interface{}
 	//NodeEphemera.Connectable == true
 	//NodeEphemera.Connected == false
@@ -72,16 +73,22 @@ type Contextdb interface {
 	GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextResponse
 	GetContextResponses(cid []byte) []*gripdata.ContextResponse
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileWrap
-	//Never ever be able to access these as valid data!  Only for debug!
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
-	StoreContextFile(c *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error)
+	//Never ever be able to access these as valid data!  Only for debug!
+	StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error)
 	GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap
-	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
+	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error)
+	DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error)
+	//Do not return error if it doesn't exist, string is the path to the file to delete, it should
+	//be nil if the file should not be deleted yet.
+	GetFileTransfersForNode(id []byte, max int) []*gripdata.ContextFileTransferWrap
 	DeleteContextFile(c *gripdata.ContextFileWrap) error
+	//Make sure it creates a DeletedContextFile record
+	GetContextFileDeleted(dig []byte) *gripdata.DeletedContextFile
 	GetContextHeads(cid []byte) []*gripdata.ContextFileWrap
 	GetContextLeaves(cid []byte, covered bool, index bool) []*gripdata.ContextFileWrap
-	//Sort by depth and size
 	GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap
+	//Sort by depth and size
 }
 
 //NodeContextdb implements both Nodedb and Contextdb

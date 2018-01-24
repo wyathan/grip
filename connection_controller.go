@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"log"
+	"os"
+	"reflect"
 	"sync"
 	"time"
 
@@ -55,15 +57,39 @@ func (ctrl *ConnectionController) sendToChan(d interface{}) {
 	}
 }
 
+func (ctrl *ConnectionController) convertFT2SD(c *gripdata.ContextFileTransferWrap) gripdata.SendData {
+	var s gripdata.SendData
+	var cf *gripdata.ContextFile
+	s.Dig = c.ContextFileTransfer.ContextFileDig
+	s.TargetID = ctrl.C.GetNodeID()
+	s.TypeName = reflect.TypeOf(cf).String()
+	return s
+}
+
+func (ctrl *ConnectionController) startFileTransfer() (int, error) {
+	sf := ctrl.DB.GetFileTransfersForNode(ctrl.C.GetNodeID(), MAXSEND)
+	var sl []gripdata.SendData
+	for _, v := range sf {
+		sl = append(sl, ctrl.convertFT2SD(v))
+	}
+	err := ctrl.sendSendDataList(sl)
+	if err != nil {
+		return 0, err
+	}
+	return len(sl), nil
+}
+
 func (ctrl *ConnectionController) sendFromDatabase() (int, error) {
-	c := 0
 	sl := ctrl.DB.GetSendData(ctrl.C.GetNodeID(), MAXSEND)
 	err := ctrl.sendSendDataList(sl)
 	if err != nil {
 		return 0, err
 	}
-	c += len(sl)
-	return c, nil
+	c, err := ctrl.startFileTransfer()
+	if err != nil {
+		return 0, err
+	}
+	return len(sl) + c, nil
 }
 
 func (ctrl *ConnectionController) sendFromList(v *gripdata.SendData) error {
@@ -109,9 +135,27 @@ func (ctrl *ConnectionController) sendSendData(d []byte) error {
 	return nil
 }
 
-func (ctrl *ConnectionController) deleteSendData(d []byte) error {
+func (ctrl *ConnectionController) deleteContextFileTransfer(d []byte) error {
+	rmf, err := ctrl.DB.DeleteContextFileTransfer(ctrl.C.GetNodeID(), d)
+	if rmf != "" {
+		oserr := os.Remove(rmf)
+		if oserr != nil {
+			log.Printf("Failed to remove file: %s", oserr)
+		}
+	}
+	return err
+}
+
+func (ctrl *ConnectionController) deleteSendDataOrFileTransfer(d []byte) error {
 	defer ctrl.Pending.Remove(base64.StdEncoding.EncodeToString(d))
-	return ctrl.DB.DeleteSendData(d, ctrl.C.GetNodeID())
+	fnd, err := ctrl.DB.DeleteSendData(d, ctrl.C.GetNodeID())
+	if err != nil {
+		return err
+	}
+	if !fnd {
+		return ctrl.deleteContextFileTransfer(d)
+	}
+	return nil
 }
 
 func (ctrl *ConnectionController) sendDataRejected(d []byte, msg string) error {
@@ -126,7 +170,7 @@ func (ctrl *ConnectionController) dataRejected(d []byte) error {
 	if err != nil {
 		return err
 	}
-	err = ctrl.deleteSendData(d)
+	err = ctrl.deleteSendDataOrFileTransfer(d)
 	if err != nil {
 		return err
 	}

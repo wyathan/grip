@@ -13,7 +13,7 @@ import (
 	StoreSendData(s *gripdata.SendData) error
 	StoreRejectedSendData(s *gripdata.RejectedSendData) error
 	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
-	DeleteSendData(d []byte, to []byte) error //Data has been setnt to the node
+	DeleteSendData(d []byte, to []byte) (bool, error) //Data has been setnt to the node
 	GetDigestData(d []byte) interface{}
 	GetConnectableNodesWithSendData(max int, curtime uint64) []gripdata.NodeEphemera
 	GetConnectableNodesWithShareNodeKey(max int, curtime uint64) []gripdata.NodeEphemera
@@ -58,19 +58,22 @@ func (t *TestDB) GetSendData(target []byte, max int) []gripdata.SendData {
 	}
 	return r
 }
-func (t *TestDB) DeleteSendData(d []byte, to []byte) error {
+func (t *TestDB) DeleteSendData(d []byte, to []byte) (bool, error) {
 	t.Lock()
 	defer t.Unlock()
 	tk := base64.StdEncoding.EncodeToString(to)
 	sl := t.SendData[tk]
 	var nl []gripdata.SendData
+	fnd := false
 	for _, v := range sl {
 		if !bytes.Equal(v.Dig, d) {
 			nl = append(nl, v)
+		} else {
+			fnd = true
 		}
 	}
 	t.SendData[tk] = nl
-	return nil
+	return fnd, nil
 }
 func (t *TestDB) GetDigestData(d []byte) interface{} {
 	t.Lock()

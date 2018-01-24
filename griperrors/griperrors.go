@@ -20,6 +20,7 @@ var AccountKeyNotAllowed error = GErr(11).Msg(EnUs, "Account does not allow node
 var MaxNodesForAccount error = GErr(12).Msg(EnUs, "Maximum number of nodes for account reached")
 var NotContextSource error = GErr(13).Msg(EnUs, "You don't have permission to add files to context")
 var DependencyProblems error = GErr(14).Msg(EnUs, "Context file dependency problems found")
+var InvalidFileSize error = GErr(15).Msg(EnUs, "ContextFile had invalid file size")
 
 func GErr(code int) *Griperr {
 	var g Griperr

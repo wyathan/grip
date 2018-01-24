@@ -59,8 +59,8 @@ func (a *TestNodeDb) StoreRejectedSendData(s *gripdata.RejectedSendData) error {
 func (a *TestNodeDb) GetSendData(target []byte, max int) []gripdata.SendData {
 	return nil
 }
-func (a *TestNodeDb) DeleteSendData(d []byte, to []byte) error {
-	return nil
+func (a *TestNodeDb) DeleteSendData(d []byte, to []byte) (bool, error) {
+	return false, nil
 }
 func (a *TestNodeDb) GetDigestData(d []byte) interface{} {
 	return nil
@@ -127,14 +127,14 @@ func (a *TestNodeDb) GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileW
 func (a *TestNodeDb) StoreVeryBadContextFile(c *gripdata.ContextFile) error {
 	return nil
 }
-func (a *TestNodeDb) StoreContextFile(c *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error) {
+func (a *TestNodeDb) StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error) {
 	return nil, nil
 }
 func (a *TestNodeDb) GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap {
 	return nil
 }
-func (a *TestNodeDb) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error {
-	return nil
+func (a *TestNodeDb) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error) {
+	return nil, nil
 }
 func (a *TestNodeDb) DeleteContextFile(c *gripdata.ContextFileWrap) error {
 	return nil
@@ -180,6 +180,15 @@ func (t *TestNodeDb) IncrNumberContexts(a *gripdata.Account) error {
 }
 func (t *TestNodeDb) IncrNumberNodes(a *gripdata.Account) error {
 	return nil
+}
+func (t *TestNodeDb) GetContextFileDeleted(dig []byte) *gripdata.DeletedContextFile {
+	return nil
+}
+func (t *TestNodeDb) GetFileTransfersForNode(id []byte, max int) []*gripdata.ContextFileTransferWrap {
+	return nil
+}
+func (t *TestNodeDb) DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error) {
+	return "", nil
 }
 
 func TestNodeCreateVerify(t *testing.T) {

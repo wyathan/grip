@@ -19,7 +19,7 @@ import (
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFile
 	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error)
-	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error
+	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error)
 	SetContextHeadFile(c *gripdata.ContextFile) error
 	RemoveContextHeadFile(dig []byte) error
 	GetAllContextHeadFiles(cid []byte, index bool) []gripdata.ContextFile
@@ -106,14 +106,13 @@ func (t *TestDB) GetContextResponses(cid []byte) []*gripdata.ContextResponse {
 	}
 	return nil
 }
-func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile, s int64) (*gripdata.ContextFileWrap, error) {
+func (t *TestDB) StoreContextFile(cf *gripdata.ContextFile) (*gripdata.ContextFileWrap, error) {
 	t.Lock()
 	defer t.Unlock()
 	cid := base64.StdEncoding.EncodeToString(cf.Context)
 	dd := base64.StdEncoding.EncodeToString(cf.DataDepDig)
 	var c gripdata.ContextFileWrap
 	c.ContextFile = cf
-	c.Size = s
 	t.ContextFilesByDepDig[dd] = &c
 	fl := t.ContextFiles[cid]
 	t.ContextFiles[cid] = append(fl, c)
@@ -131,15 +130,35 @@ func (t *TestDB) GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextF
 	defer t.Unlock()
 	return t.TGetAllThatDependOn(cid, dig)
 }
-func (t *TestDB) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) error {
+func (t *TestDB) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error) {
 	t.Lock()
 	defer t.Unlock()
+	var w gripdata.ContextFileTransferWrap
+	w.ContextFileTransfer = c
 	scid := base64.StdEncoding.EncodeToString(c.TrasnferTo)
 	fl := t.FileTransfers[scid]
-	fl = append(fl, *c)
+	fl = append(fl, &w)
 	t.FileTransfers[scid] = fl
 	t.addDig(c)
-	return nil
+	return &w, nil
+}
+func (t *TestDB) DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error) {
+	t.Lock()
+	defer t.Unlock()
+	snid := base64.StdEncoding.EncodeToString(nodeid)
+	var tf []*gripdata.ContextFileTransferWrap
+	fl := t.FileTransfers[snid]
+	if fl != nil {
+		for _, w := range fl {
+			if !bytes.Equal(w.ContextFileTransfer.ContextFileDig, confiledig) {
+				tf = append(tf, w)
+			}
+		}
+	}
+	t.FileTransfers[snid] = tf
+	//Doesn't hurt to just say you can never delete for now.
+	//TODO: Add function to check if we can delete the file
+	return "", nil
 }
 func (t *TestDB) DeleteContextFile(c *gripdata.ContextFileWrap) error {
 	t.Lock()
@@ -155,6 +174,12 @@ func (t *TestDB) DeleteContextFile(c *gripdata.ContextFileWrap) error {
 	t.ContextFiles[scid] = nl
 	scid = base64.StdEncoding.EncodeToString(c.ContextFile.DataDepDig)
 	delete(t.ContextFilesByDepDig, scid)
+	sdig := base64.StdEncoding.EncodeToString(c.ContextFile.Dig)
+	var d gripdata.DeletedContextFile
+	d.Context = c.ContextFile.Context
+	d.DataDepDig = c.ContextFile.DataDepDig
+	d.Dig = c.ContextFile.Dig
+	t.DeletedFiles[sdig] = &d
 	return nil
 }
 func (t *TestDB) TGetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap {
@@ -230,6 +255,18 @@ func (t *TestDB) GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap {
 	r = mergeSortDepth(r)
 	return r
 }
+func (t *TestDB) GetFileTransfersForNode(id []byte, max int) []*gripdata.ContextFileTransferWrap {
+	scid := base64.StdEncoding.EncodeToString(id)
+	fl := t.FileTransfers[scid]
+	if len(fl) < max {
+		max = len(fl)
+	}
+	return fl[0:max]
+}
+func (t *TestDB) GetContextFileDeleted(dig []byte) *gripdata.DeletedContextFile {
+	scid := base64.StdEncoding.EncodeToString(dig)
+	return t.DeletedFiles[scid]
+}
 
 type depthCompare struct{}
 
@@ -244,7 +281,7 @@ func mergeSortDepth(s []*gripdata.ContextFileWrap) []*gripdata.ContextFileWrap {
 type sizeCompare struct{}
 
 func (d *sizeCompare) Compare(a *gripdata.ContextFileWrap, b *gripdata.ContextFileWrap) int {
-	return int(a.Size - b.Size)
+	return int(a.ContextFile.Size - b.ContextFile.Size)
 }
 
 func mergeSortSize(s []*gripdata.ContextFileWrap) []*gripdata.ContextFileWrap {

@@ -200,6 +200,9 @@ func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 		return err2
 	}
 	size := uint64(st.Size())
+	if size != c.Size {
+		return griperrors.InvalidFileSize
+	}
 	//Free storage if needed
 	err = FreeSpace(ctx, size, db)
 	if err != nil {
@@ -210,7 +213,7 @@ func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.StoreContextFile(c, int64(size))
+	_, err = db.StoreContextFile(c)
 	if err != nil {
 		return err
 	}

@@ -11,10 +11,10 @@ import (
 //in a context to make sure new nodes get the context files they need
 //ContextFile file data pertaining to a context
 type ContextFileTransfer struct {
-	Context    []byte //The context the file is from
-	DataDepDig []byte //The DataDepDig for the file to transfer
-	TrasnferTo []byte //The id of the node to transfer the file to
-	Dig        []byte //Just digest of Context, DataDebDig, and TransferTo
+	Context        []byte //The context the file is from
+	ContextFileDig []byte //The ContextFile Dig
+	TrasnferTo     []byte //The id of the node to transfer the file to
+	Dig            []byte //Just digest of Context, DataDebDig, and TransferTo
 	//this way we only keep one transfer per file and not
 	//duplicates for every node that has a full repo
 
@@ -26,7 +26,7 @@ type ContextFileTransfer struct {
 func (a *ContextFileTransfer) Digest() []byte {
 	h := sha512.New()
 	gripcrypto.HashBytes(h, a.Context)
-	gripcrypto.HashBytes(h, a.DataDepDig)
+	gripcrypto.HashBytes(h, a.ContextFileDig)
 	gripcrypto.HashBytes(h, a.TrasnferTo)
 	a.Dig = h.Sum(nil)
 	return a.Dig

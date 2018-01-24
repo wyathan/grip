@@ -135,6 +135,12 @@ func findAndSendToContextParticipants(c gripcrypto.SignInf, ctxid []byte, db DB)
 	return nil
 }
 
+func PrepSendToAllContextParticipants(ctxid []byte) SProc {
+	return func(s gripcrypto.SignInf, db DB) (bool, error) {
+		return true, SendToAllContextParticipants(s, ctxid, db)
+	}
+}
+
 //SendToAllContextParticipants Send context data to all participants
 func SendToAllContextParticipants(c gripcrypto.SignInf, ctxid []byte, db DB) error {
 	//Send to the context owner
@@ -154,7 +160,7 @@ func SendToAllContextParticipants(c gripcrypto.SignInf, ctxid []byte, db DB) err
 	return nil
 }
 
-func validateFile(c *gripdata.ContextFile) error {
+func validateFileSetSize(c *gripdata.ContextFile) error {
 	st, err := os.Stat(c.GetPath())
 	if os.IsNotExist(err) {
 		return errors.New("Path does not exist")
@@ -162,6 +168,7 @@ func validateFile(c *gripdata.ContextFile) error {
 	if (st.Mode() & os.ModeType) != 0 {
 		return errors.New("Path is not a regular file")
 	}
+	c.Size = uint64(st.Size())
 	return nil
 }
 
@@ -194,8 +201,8 @@ func validateContextFileDepsAndSign(c *gripdata.ContextFile, db DB) error {
 	return nil
 }
 
-func validateAndSignContextFile(c *gripdata.ContextFile, db DB) error {
-	err := validateFile(c)
+func validateAndSignSetSizeContextFile(c *gripdata.ContextFile, db DB) error {
+	err := validateFileSetSize(c)
 	if err != nil {
 		return err
 	}
@@ -216,11 +223,12 @@ func GetFileSize(p string) int64 {
 
 //NewContextFile add a new file for a context
 func NewContextFile(c *gripdata.ContextFile, db DB) error {
-	err := validateAndSignContextFile(c, db)
+	err := validateAndSignSetSizeContextFile(c, db)
 	if err != nil {
 		return err
 	}
-	_, err = db.StoreContextFile(c, GetFileSize(c.GetPath()))
+
+	_, err = db.StoreContextFile(c)
 	if err != nil {
 		return err
 	}
