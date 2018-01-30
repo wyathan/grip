@@ -36,10 +36,11 @@ type Nodedb interface {
 type Netdb interface {
 	StoreSendData(s *gripdata.SendData) error
 	StoreRejectedSendData(s *gripdata.RejectedSendData) error
-	GetSendData(target []byte, max int) []gripdata.SendData //get all send data for target node
-	//                                                           WARNING! Must be sorted by Timestamp
-	DeleteSendData(d []byte, to []byte) (bool, error) //Data has been setnt to the node, no error if missing
-	// return bool as true if successfully deleted, false if it didn't exist
+	//get all send data for target node, must be sorted by Timestamp
+	GetSendData(target []byte, max int) []gripdata.SendData
+	//Data has been setnt to the node, no error if missing
+	//return bool as true if successfully deleted, false if it didn't exist
+	DeleteSendData(d []byte, to []byte) (bool, error)
 	GetDigestData(d []byte) interface{}
 	//NodeEphemera.Connectable == true
 	//NodeEphemera.Connected == false
@@ -52,6 +53,8 @@ type Netdb interface {
 	//Get nodes that we have sent a UseShareNodeKey so we can connect to them
 	//if they are connectable
 	GetConnectableUseShareKeyNodes(max int, curtime uint64) []gripdata.NodeEphemera
+	//Get nodes with file transfers to them.
+	GetConnectableWithFileTransfers(max int, curtime uint64) []gripdata.NodeEphemera
 	GetConnectableAny(max int, curtime uint64) []gripdata.NodeEphemera
 	GetAllConnected() []gripdata.NodeEphemera
 	CreateNodeEphemera(id []byte, connectable bool) error
@@ -60,6 +63,11 @@ type Netdb interface {
 	CanNodeEphemeraGoPending(id []byte) bool
 	SetNodeEphemeraConnected(incomming bool, id []byte, curtime uint64) error
 	SetNodeEphemeraClosed(id []byte) error
+	//Get all the ContextRequest/ContextResponse pairs for this node
+	GetNodeContextPairs(id []byte) map[string]*gripdata.ContextPairWrap
+	//See if there are ContextFileTransfers for this context
+	//For currently connected nodes.  If there are, request
+	GetFileTransfersForConnected(conid []byte) []*gripdata.ContextFileTransferWrap
 }
 
 //Contextdb sotre/load context data
@@ -73,22 +81,24 @@ type Contextdb interface {
 	GetContextResponse(cid []byte, tgtid []byte) *gripdata.ContextResponse
 	GetContextResponses(cid []byte) []*gripdata.ContextResponse
 	GetContextFileByDepDataDig(d []byte) *gripdata.ContextFileWrap
-	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	//Never ever be able to access these as valid data!  Only for debug!
+	StoreVeryBadContextFile(c *gripdata.ContextFile) error
 	StoreContextFile(c *gripdata.ContextFile) (*gripdata.ContextFileWrap, error)
 	GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.ContextFileWrap
 	StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error)
-	DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error)
 	//Do not return error if it doesn't exist, string is the path to the file to delete, it should
 	//be nil if the file should not be deleted yet.
+	DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error)
 	GetFileTransfersForNode(id []byte, max int) []*gripdata.ContextFileTransferWrap
-	DeleteContextFile(c *gripdata.ContextFileWrap) error
+	SetContextFileForTransfer(cf *gripdata.ContextFile) error
 	//Make sure it creates a DeletedContextFile record
+	DeleteContextFile(c *gripdata.ContextFileWrap) error
+	//Gets a deleted record based on the ContextFileDig
 	GetContextFileDeleted(dig []byte) *gripdata.DeletedContextFile
 	GetContextHeads(cid []byte) []*gripdata.ContextFileWrap
 	GetContextLeaves(cid []byte, covered bool, index bool) []*gripdata.ContextFileWrap
-	GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap
 	//Sort by depth and size
+	GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap
 }
 
 //NodeContextdb implements both Nodedb and Contextdb

@@ -3,7 +3,6 @@ package grip
 import (
 	"encoding/base64"
 	"log"
-	"math/rand"
 	"time"
 
 	"github.com/wyathan/grip/gripdata"
@@ -35,58 +34,38 @@ func (s *SocketController) canAttempt(attempted *map[string]uint64, id []byte, n
 	}
 	return false
 }
-func (s *SocketController) connectToNodesWithSendData(attempted *map[string]uint64) {
+
+type getConnectable func(max int, curtime uint64) []gripdata.NodeEphemera
+
+func (s *SocketController) connectTo(dbf getConnectable, attempted *map[string]uint64) {
 	nt := uint64(time.Now().UnixNano())
 	nm := s.numberConnections()
 	if nm <= MAXCONNECTIONS {
-		cl := s.DB.GetConnectableNodesWithSendData(MAXCONNECTIONATTEMPTS, nt)
+		cl := dbf(MAXCONNECTIONATTEMPTS, nt)
 		for _, c := range cl {
 			if s.canAttempt(attempted, c.ID, nt) {
 				s.connectToNodeEphemera(&c)
 			}
 		}
 	}
+}
+
+func (s *SocketController) connectToNodesWithSendData(attempted *map[string]uint64) {
+	s.connectTo(s.DB.GetConnectableNodesWithSendData, attempted)
 }
 func (s *SocketController) connectToNodesWithShareNodeKey(attempted *map[string]uint64) {
-	nt := uint64(time.Now().UnixNano())
-	nm := s.numberConnections()
-	if nm <= MAXCONNECTIONS {
-		cl := s.DB.GetConnectableNodesWithShareNodeKey(MAXCONNECTIONATTEMPTS, nt)
-		for _, c := range cl {
-			if s.canAttempt(attempted, c.ID, nt) {
-				s.connectToNodeEphemera(&c)
-			}
-		}
-	}
+	s.connectTo(s.DB.GetConnectableNodesWithShareNodeKey, attempted)
 }
 func (s *SocketController) connectToNodesWithUseShareKey(attempted *map[string]uint64) {
-	nt := uint64(time.Now().UnixNano())
-	nm := s.numberConnections()
-	if nm <= MAXCONNECTIONS {
-		cl := s.DB.GetConnectableUseShareKeyNodes(MAXCONNECTIONATTEMPTS, nt)
-		for _, c := range cl {
-			if s.canAttempt(attempted, c.ID, nt) {
-				s.connectToNodeEphemera(&c)
-			}
-		}
-	}
+	s.connectTo(s.DB.GetConnectableUseShareKeyNodes, attempted)
+}
+func (s *SocketController) connectToNodesWithFileTransfers(attempted *map[string]uint64) {
+	s.connectTo(s.DB.GetConnectableWithFileTransfers, attempted)
 }
 func (s *SocketController) connectToAnyNodes(attempted *map[string]uint64) {
-	nt := uint64(time.Now().UnixNano())
-	nm := s.numberConnections()
-	if nm <= MAXCONNECTIONS {
-		cl := s.DB.GetConnectableAny(MAXCONNECTIONATTEMPTS, nt)
-		//Select one at random
-		ln := len(cl)
-		if ln > 0 {
-			idx := rand.Intn(len(cl))
-			if s.canAttempt(attempted, cl[idx].ID, nt) {
-				log.Printf("Attempt random connection")
-				s.connectToNodeEphemera(&cl[idx])
-			}
-		}
-	}
+	s.connectTo(s.DB.GetConnectableAny, attempted)
 }
+
 func (s *SocketController) connectRoutine() {
 	attempted := make(map[string]uint64)
 	for !s.Done {

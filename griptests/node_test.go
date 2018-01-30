@@ -136,6 +136,9 @@ func (a *TestNodeDb) GetAllThatDependOn(cid []byte, dig []byte) []*gripdata.Cont
 func (a *TestNodeDb) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gripdata.ContextFileTransferWrap, error) {
 	return nil, nil
 }
+func (a *TestNodeDb) SetContextFileForTransfer(cf *gripdata.ContextFile) error {
+	return nil
+}
 func (a *TestNodeDb) DeleteContextFile(c *gripdata.ContextFileWrap) error {
 	return nil
 }
@@ -189,6 +192,15 @@ func (t *TestNodeDb) GetFileTransfersForNode(id []byte, max int) []*gripdata.Con
 }
 func (t *TestNodeDb) DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error) {
 	return "", nil
+}
+func (t *TestNodeDb) GetConnectableWithFileTransfers(max int, curtime uint64) []gripdata.NodeEphemera {
+	return nil
+}
+func (t *TestNodeDb) GetNodeContextPairs(id []byte) map[string]*gripdata.ContextPairWrap {
+	return nil
+}
+func (t *TestNodeDb) GetFileTransfersForConnected(conid []byte) []*gripdata.ContextFileTransferWrap {
+	return nil
 }
 
 func TestNodeCreateVerify(t *testing.T) {

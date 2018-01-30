@@ -177,6 +177,34 @@ func (ctrl *ConnectionController) dataRejected(d []byte) error {
 	return nil
 }
 
+func (ctrl *ConnectionController) getFileTransferData() error {
+	//Get the contexts for this local node
+	myid, _ := ctrl.DB.GetPrivateNodeData()
+	myctxlst := ctrl.DB.GetNodeContextPairs(myid.ID)
+	//See what contexts the connected node is a full repo for
+	ctxlst := ctrl.DB.GetNodeContextPairs(ctrl.C.GetNodeID())
+	//See if there are ContextFileTransfers for any of those Contexts
+	for _, ctx := range ctxlst {
+		mypair := myctxlst[ctx.GetIdStr()]
+		//Make sure the connected node is a FullRepo and we are not.
+		//if we are FullRepo the files just come from us
+		if ctx.IsFullRepo() && (mypair != nil && !mypair.IsFullRepo()) {
+			//Get all transfers to connected nodes for this context, and
+			xferlst := ctrl.DB.GetFileTransfersForConnected(ctx.Request.ContextDig)
+			for _, xfr := range xferlst {
+				//Make sure we don't have it already in the this transfer
+				if xfr.ContextFile == nil {
+					//ask this connected node for a copy of the file
+					var crq ReqContextFile
+					crq.Dig = xfr.ContextFileTransfer.ContextFileDig
+					ctrl.sendToChan(crq)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (ctrl *ConnectionController) storeDataRejected(d []byte) error {
 	r := gripdata.RejectedSendData{}
 	r.Dig = d

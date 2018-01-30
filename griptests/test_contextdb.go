@@ -138,9 +138,31 @@ func (t *TestDB) StoreContextFileTransfer(c *gripdata.ContextFileTransfer) (*gri
 	scid := base64.StdEncoding.EncodeToString(c.TrasnferTo)
 	fl := t.FileTransfers[scid]
 	fl = append(fl, &w)
+	cfdig := base64.StdEncoding.EncodeToString(c.ContextFileDig)
+	dd := t.DigData[cfdig]
+	if dd != nil {
+		switch v := dd.(type) {
+		case *gripdata.ContextFile:
+			w.ContextFile = v
+		}
+	}
 	t.FileTransfers[scid] = fl
 	t.addDig(c)
 	return &w, nil
+}
+func (t *TestDB) SetContextFileForTransfer(cf *gripdata.ContextFile) error {
+	t.Lock()
+	defer t.Unlock()
+	for _, v := range t.FileTransfers {
+		for _, tf := range v {
+			if bytes.Equal(cf.Dig, tf.ContextFileTransfer.ContextFileDig) {
+				tf.ContextFile = cf
+			}
+		}
+	}
+	//Add the dig because we still need to be able to get the cf by its dig
+	t.addDig(cf)
+	return nil
 }
 func (t *TestDB) DeleteContextFileTransfer(nodeid []byte, confiledig []byte) (string, error) {
 	t.Lock()
@@ -258,14 +280,25 @@ func (t *TestDB) GetCoveredSnapshots(cid []byte) []*gripdata.ContextFileWrap {
 func (t *TestDB) GetFileTransfersForNode(id []byte, max int) []*gripdata.ContextFileTransferWrap {
 	scid := base64.StdEncoding.EncodeToString(id)
 	fl := t.FileTransfers[scid]
-	if len(fl) < max {
-		max = len(fl)
+	var o []*gripdata.ContextFileTransferWrap
+	for ix := 0; ix < len(fl) && len(o) < max; ix++ {
+		v := fl[ix]
+		if v.ContextFile != nil {
+			o = append(o, fl[ix])
+		}
 	}
-	return fl[0:max]
+	return o
 }
 func (t *TestDB) GetContextFileDeleted(dig []byte) *gripdata.DeletedContextFile {
 	scid := base64.StdEncoding.EncodeToString(dig)
 	return t.DeletedFiles[scid]
+}
+func (t *TestDB) GetNodeContextPairs(id []byte) map[string]*gripdata.ContextPairWrap {
+	return nil
+}
+func (t *TestDB) GetFileTransfersForConnected(conid []byte) []*gripdata.ContextFileTransferWrap {
+	//TODO: Implement
+	return nil
 }
 
 type depthCompare struct{}

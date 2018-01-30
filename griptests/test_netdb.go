@@ -141,6 +141,29 @@ func (t *TestDB) GetConnectableUseShareKeyNodes(max int, curtime uint64) []gripd
 	}
 	return r
 }
+func (t *TestDB) GetConnectableWithFileTransfers(max int, curtime uint64) []gripdata.NodeEphemera {
+	t.Lock()
+	defer t.Unlock()
+	var r []gripdata.NodeEphemera
+	for tn, l := range t.FileTransfers {
+		cn := false
+		for _, ft := range l {
+			if ft.ContextFile != nil {
+				cn = true
+				break
+			}
+		}
+		if cn {
+			v := t.NodeEphemera[tn]
+			if v != nil {
+				if !v.Connected && len(r) < max && v.NextAttempt <= curtime && v.Connectable {
+					r = append(r, *v)
+				}
+			}
+		}
+	}
+	return r
+}
 func (t *TestDB) GetConnectableAny(max int, curtime uint64) []gripdata.NodeEphemera {
 	t.Lock()
 	defer t.Unlock()

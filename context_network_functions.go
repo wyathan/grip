@@ -193,34 +193,40 @@ func IncomingContextFile(c *gripdata.ContextFile, db DB) error {
 	if !((bytes.Equal(ctx.NodeID, c.NodeID) || a.AllowContextSource) && a.Enabled) {
 		return griperrors.NotContextSource
 	}
-	//You are here
-	//Check file size
-	st, err2 := os.Stat(c.GetPath())
-	if err2 != nil {
-		return err2
+	//Check if this is deleted for us
+	dl := db.GetContextFileDeleted(c.Dig)
+	if dl == nil {
+		//Check file size
+		st, err2 := os.Stat(c.GetPath())
+		if err2 != nil {
+			return err2
+		}
+		size := uint64(st.Size())
+		if size != c.Size {
+			return griperrors.InvalidFileSize
+		}
+		//See if the file is deleted already
+
+		//Free storage if needed
+		err = FreeSpace(ctx, size, db)
+		if err != nil {
+			return err
+		}
+		//Check max file storage
+		err = db.CheckUpdateStorageUsed(a, size)
+		if err != nil {
+			return err
+		}
+		_, err = db.StoreContextFile(c)
+		if err != nil {
+			return err
+		}
+		//Forward to other participants
+		err = SendToAllContextParticipants(c, c.Context, db)
+		if err != nil {
+			return err
+		}
 	}
-	size := uint64(st.Size())
-	if size != c.Size {
-		return griperrors.InvalidFileSize
-	}
-	//Free storage if needed
-	err = FreeSpace(ctx, size, db)
-	if err != nil {
-		return err
-	}
-	//Check max file storage
-	err = db.CheckUpdateStorageUsed(a, size)
-	if err != nil {
-		return err
-	}
-	_, err = db.StoreContextFile(c)
-	if err != nil {
-		return err
-	}
-	//Forward to other participants
-	err = SendToAllContextParticipants(c, c.Context, db)
-	if err != nil {
-		return err
-	}
-	return nil
+	//Check if there is a ContextFileTransferWrap that matches
+	return db.SetContextFileForTransfer(c)
 }

@@ -1,8 +1,8 @@
 
+- You just added send ContextFile requests for transfers to connected nodes.
+    - You need to add a Pending list so we don't re-request files we've already asked for.
+
 - Check accounts for locally created ContextFiles
-- Review if we need to check accounts for creating contexts
-    - Remote log-ins are for contexts only, so they would already
-      need to be created
 - Add file transfers
     - Create file transfers for all new accepting ContextResponses
         - If full repo create file transfers for all files.
@@ -21,3 +21,5 @@
     - When receiving incoming ContextFile check if matching DeletedContextFile exists
         don't save it to the regular ContextFiles if so.
     - Add to existing matching ContextFileTrasnfers 
+- Connect to nodes we have ContextFileTransfers for
+- Do not add DeletedContextFile to the objects returned from GetDigestData

@@ -88,3 +88,10 @@ type RejectDig struct {
 type AckDig struct {
 	Dig []byte
 }
+
+//ReqContextFile requests a ContextFile be (re)sent
+//to this node.  Most likely so that it can just
+//send it along to another node.
+type ReqContextFile struct {
+	Dig []byte
+}
